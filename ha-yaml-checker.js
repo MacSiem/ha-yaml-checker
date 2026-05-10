@@ -521,7 +521,6 @@ if (typeof window !== 'undefined') {
 class HAYamlChecker extends HTMLElement {
   static getConfigElement() { return document.createElement('ha-yaml-checker-editor'); }
   static getStubConfig() { return { type: 'custom:ha-yaml-checker', title: 'YAML Checker' }; }
-  setConfig(config) { this._config = config || {}; }
   constructor() {
     super();
     this._toolId = this.tagName.toLowerCase().replace('ha-', '');
