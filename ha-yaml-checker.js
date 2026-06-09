@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v4.1.3 (2026-05-12) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v4.1.5 (2026-06-07) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -1083,6 +1083,7 @@ class HAYamlChecker extends HTMLElement {
   }
 
   getCardSize() { return 8; }
+  getGridOptions() { return { rows: 8, columns: 12, min_rows: 3, min_columns: 6 }; }
 
   _sanitize(s) { try { return decodeURIComponent(escape(s)); } catch(e) { return s; } }
 
