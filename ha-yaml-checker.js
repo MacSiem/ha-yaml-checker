@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v4.1.6 (2026-06-07) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v4.1.7 (2026-06-07) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -31,6 +31,8 @@ if (typeof window !== 'undefined' && !window.HAToolsBentoCSS) {
    HA Tools — Bento Design System v2.0 (Premium)
    ═══════════════════════════════════════════════ */
 
+/* keyboard a11y */
+:focus-visible { outline: 2px solid var(--bento-primary, #6366f1); outline-offset: 2px; border-radius: 3px; }
 
 :host {
   /* Brand palette — diamond top, gradient-friendly */
@@ -1792,9 +1794,16 @@ ${this._css()}
           <span class="version-badge">v3.0</span>
         
         </div>
-        <div class="tabs" id="tabs">
+        <div class="tabs" id="tabs" role="tablist">
           ${['config-check','entity-validator','file-scanner','paste-validate','template-tester','common-issues'].map(t => `
-            <button class="tab-btn${t===this._activeTab?' active':''}" data-tab="${t}">
+            <button class="tab-btn${t===this._activeTab?' active':''}" data-tab="${t}" role="tab" aria-selected="${t===this._activeTab}" aria-label="${{
+                'config-check': 'Config Check',
+                'entity-validator': 'Entity Validator',
+                'file-scanner': 'File Scanner',
+                'paste-validate': 'Paste Validate',
+                'template-tester': 'Template Tester',
+                'common-issues': 'Common Issues Guide',
+              }[t]}">
               ${{
                 'config-check': '✅ Config',
                 'entity-validator': '🔗 Encje',
@@ -1835,7 +1844,7 @@ ${this._css()}
         ${!this._checkLoading && !r ? '<div class="empty-hint">' + this._t.clickToCheck + '</div>' : ''}
         ${!this._checkLoading && r ? this._renderCheckResult(r) : ''}
         <div style="margin-top:16px;">
-          <button class="btn btn-primary" id="btn-check">✅ ${this._t.checkConfigBtn}</button>
+          <button class="btn btn-primary" id="btn-check" aria-label="${this._t.checkConfigBtn || 'Check configuration'}">✅ ${this._t.checkConfigBtn}</button>
         </div>
       </div>
     `;
@@ -1876,7 +1885,7 @@ ${this._css()}
         ${!this._entityLoading && r && r.error ? `<div class="error-box">❌ ${this._lang === 'pl' ? 'B\u0142\u0105d' : 'Error'}: ${r.error}</div>` : ''}
         ${!this._entityLoading && r && !r.error ? this._renderEntityResult(r) : ''}
         <div style="margin-top:16px;">
-          <button class="btn btn-primary" id="btn-entity">🔗 ${this._t.scanEntitiesBtn || 'Scan Entities'}</button>
+          <button class="btn btn-primary" id="btn-entity" aria-label="${this._t.scanEntitiesBtn || 'Scan Entities'}">🔗 ${this._t.scanEntitiesBtn || 'Scan Entities'}</button>
         </div>
       </div>
     `;
@@ -1959,7 +1968,7 @@ ${this._css()}
         ${!this._scanLoading && !r ? '<div class="empty-hint">' + this._t.clickToScanSystem + '</div>' : ''}
         ${!this._scanLoading && r ? this._renderScanResult(r) : ''}
         <div style="margin-top:16px;">
-          <button class="btn btn-primary" id="btn-scan">📁 ${this._lang === 'pl' ? 'Skanuj system' : 'Scan System'}</button>
+          <button class="btn btn-primary" id="btn-scan" aria-label="${this._lang === 'pl' ? 'Skanuj system' : 'Scan System'}">📁 ${this._lang === 'pl' ? 'Skanuj system' : 'Scan System'}</button>
         </div>
       </div>
     `;
@@ -2010,7 +2019,7 @@ ${this._css()}
             <button class="btn btn-sm" id="btn-clear-paste">${this._t.clearBtn}</button>
           </div>
           <textarea class="yaml-textarea" id="yaml-input" placeholder="# ${this._t.pasteHint}\nautomation:\n  - alias: Test\n    trigger:\n      - platform: state\n        entity_id: light.salon">${this._pasteValue}</textarea>
-          <button class="btn btn-primary" id="btn-validate">🔍 ${this._t.validateBtn}</button>
+          <button class="btn btn-primary" id="btn-validate" aria-label="${this._t.validateBtn || 'Validate YAML'}">🔍 ${this._t.validateBtn}</button>
           ${this._pasteErrors && (errors.length || warnings.length) ? `
             <div class="paste-results">
               <div class="result-header ${errors.length ? 'error' : 'warning'}">
@@ -2060,7 +2069,7 @@ ${this._css()}
             ${!r.ok ? `<div class="error-box">${r.error}</div>` : ''}
           ` : ''}
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-primary" id="btn-template">▶️ ${this._t.executeTemplate}</button>
+            <button class="btn btn-primary" id="btn-template" aria-label="${this._t.executeTemplate || 'Execute template'}">▶️ ${this._t.executeTemplate}</button>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               ${[
                 ['{{ states("sun.sun") }}', '☀️ sun'],
