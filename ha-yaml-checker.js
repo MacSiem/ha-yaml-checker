@@ -565,7 +565,7 @@ if (typeof window !== 'undefined' && !window.__haToolsSplitDonateInjector) {
   };
   // Per-tool first-run intro banner (one-line scope + 3 use cases)
   var INTROS = {
-    'ha-yaml-checker': { headline: 'Validate Home Assistant YAML configuration on demand.', steps: ['Click \'Check HA Configuration\' to run homeassistant.check_config.', 'Switch to \'Encje\' tab to search entities by domain.', 'Use \'Template\' tab to preview Jinja2 templates.'] },
+    'ha-yaml-checker': { headline: 'Validate Home Assistant YAML configuration on demand.', steps: ['Click \'Check HA Configuration\' to run homeassistant.check_config.', 'Switch to \'Entities\' tab to search entities by domain.', 'Use \'Template\' tab to preview Jinja2 templates.'] },
     'ha-data-exporter': { headline: 'Browse, filter, and export Home Assistant entity data.', steps: ['Filter by domain or search entities live.', 'Take a snapshot or export selection to CSV / JSON.', 'Privacy warning before downloading attributes with sensitive data.'] },
     'ha-chore-tracker': { headline: 'Household chore tracker with kanban + recurring schedules.', steps: ['Add a chore: name + assignee + frequency.', 'Drag from \'Todo\' to \'Done\' to mark complete.', 'Stats tab shows counts per assignee.'] },
     'ha-energy-optimizer': { headline: 'Tariff-aware energy usage with hourly heatmaps + tips.', steps: ['Today / Yesterday / 7-day / 30-day usage and cost.', 'Patterns tab — hourly heatmap of consumption.', 'Recommendations tab — auto-generated tips.'] },
@@ -1806,8 +1806,8 @@ ${this._css()}
               }[t]}">
               ${{
                 'config-check': '✅ Config',
-                'entity-validator': '🔗 Encje',
-                'file-scanner': '📁 Pliki',
+                'entity-validator': '🔗 Entities',
+                'file-scanner': '📁 Files',
                 'paste-validate': '📝 Paste',
                 'template-tester': '🧪 Template',
                 'common-issues': this._t.guideTabLabel,

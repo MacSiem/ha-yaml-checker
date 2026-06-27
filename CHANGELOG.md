@@ -1,5 +1,10 @@
 # Changelog — YAML Checker
 
+## [4.1.8] - 2026-06-27
+
+- Fix: the "Entities" and "Files" tab labels (and the onboarding hint) were hardcoded in Polish ("Encje" / "Pliki"); they now render in English to match the rest of the card's UI.
+- Docs: added a real card screenshot to the README.
+
 ## [4.1.7] - 2026-06-15
 
 - Theme: dark/light now follows the active Home Assistant theme (luminance of --card-background-color) instead of OS prefers-color-scheme.
