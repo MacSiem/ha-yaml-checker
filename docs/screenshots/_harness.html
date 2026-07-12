@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YC screenshot harness</title>
+<style>
+  html, body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body.light { background: #f4f5f7; }
+  body.light ha-yaml-checker { --card-background-color: #ffffff; --primary-background-color: #f4f5f7; }
+  body.dark { background: #111318; }
+  body.dark ha-yaml-checker { --card-background-color: #1c1e26; --primary-background-color: #111318; }
+  ha-yaml-checker { display: block; width: 480px; }
+</style>
+</head>
+<body>
+<ha-yaml-checker id="card"></ha-yaml-checker>
+<script>
+  try { localStorage.setItem('ha-intro-dismissed-ha-yaml-checker', '1'); } catch (e) {}
+</script>
+<script src="../../ha-yaml-checker.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  document.body.className = theme;
+
+  const KNOWN_TABS = ['config-check', 'entity-validator', 'file-scanner', 'paste-validate', 'template-tester', 'common-issues'];
+  const tabParam = params.get('tab');
+  const tab = KNOWN_TABS.includes(tabParam) ? tabParam : 'config-check';
+  try { localStorage.setItem('ha-tools-yaml-checker-settings', JSON.stringify({ _activeTab: tab })); } catch (e) {}
+
+  const now = Date.now();
+
+  // ── Demo entities (hass.states) ────────────────────────────────────────
+  const mkState = (id, state, attrs) => ({
+    entity_id: id, state,
+    attributes: Object.assign({ friendly_name: id }, attrs || {}),
+    last_changed: new Date(now - 3600000).toISOString(),
+    last_updated: new Date(now - 3600000).toISOString(),
+  });
+
+  const states = {};
+  [
+    mkState('sun.sun', 'above_horizon', { friendly_name: 'Sun', elevation: 45.2, azimuth: 210.4 }),
+    mkState('light.living_room', 'on', { friendly_name: 'Living Room Light', brightness: 200 }),
+    mkState('light.kitchen', 'off', { friendly_name: 'Kitchen Light' }),
+    mkState('switch.fan', 'on', { friendly_name: 'Fan' }),
+    mkState('binary_sensor.motion_hallway', 'off', { friendly_name: 'Hallway Motion', device_class: 'motion' }),
+    mkState('sensor.temperature_living_room', '21.4', { friendly_name: 'Living Room Temperature', unit_of_measurement: '°C', device_class: 'temperature' }),
+    mkState('sensor.humidity', '45', { friendly_name: 'Humidity', unit_of_measurement: '%', device_class: 'humidity' }),
+    mkState('climate.thermostat', 'heat', { friendly_name: 'Thermostat', temperature: 21 }),
+    mkState('person.maciej', 'home', { friendly_name: 'Maciej' }),
+    mkState('automation.morning_lights', 'on', { friendly_name: 'Morning lights on sunrise' }),
+    mkState('automation.night_thermostat', 'on', { friendly_name: 'Night thermostat setback' }),
+    mkState('script.good_morning', 'off', { friendly_name: 'Good Morning' }),
+    // Demo issues for the Entity Validator tab
+    mkState('sensor.pool_temp', 'unavailable', { friendly_name: 'Pool Temperature' }),
+    mkState('sensor.attic_humidity', 'unknown', { friendly_name: 'Attic Humidity' }),
+  ].forEach((s) => { states[s.entity_id] = s; });
+  // Entity with no friendly_name — demonstrates the "entities without friendly_name" note.
+  states['sensor.no_name_demo'] = { entity_id: 'sensor.no_name_demo', state: '5', attributes: {}, last_changed: new Date(now - 3600000).toISOString(), last_updated: new Date(now - 3600000).toISOString() };
+
+  // ── Demo automations / scripts (config/automation/config, config/script/config) ──
+  const automationsConfig = [
+    { id: '1001', alias: 'Morning lights on sunrise', description: 'Turn on living room light at sunrise', trigger: [{ platform: 'sun', event: 'sunrise' }], condition: [], action: [{ service: 'light.turn_on', target: { entity_id: 'light.living_room' } }] },
+    { id: '1002', alias: 'Night thermostat setback', description: 'Lower heat at night', trigger: [{ platform: 'time', at: '22:00:00' }], condition: [], action: [{ service: 'climate.set_temperature', target: { entity_id: 'climate.thermostat' }, data: { temperature: 18 } }] },
+    { id: '1003', alias: 'Broken sensor reference demo', trigger: [{ platform: 'state', entity_id: 'sensor.old_removed_sensor' }], condition: [], action: [{ service: 'notify.notify', data: { message: 'test' } }] },
+    { id: '1003', alias: 'Duplicate id demo', trigger: [{ platform: 'state', entity_id: 'binary_sensor.motion_hallway' }], condition: [], action: [] },
+  ];
+  const scriptsConfig = {
+    good_morning: { alias: 'Good Morning', sequence: [{ service: 'light.turn_on', target: { entity_id: 'light.kitchen' } }] },
+  };
+
+  // ── Tiny fake Jinja2 renderer for the Template Tester tab ──────────────
+  function fakeRenderTemplate(tpl) {
+    if (!tpl) return '';
+    let inner = tpl.trim();
+    if (inner.startsWith('{{') && inner.endsWith('}}')) inner = inner.slice(2, -2).trim();
+    inner = inner.replace(/states\(["']([^"']+)["']\)/g, (_, id) => (states[id] ? states[id].state : 'unknown'));
+    inner = inner.replace(/state_attr\(["']([^"']+)["'],\s*["']([^"']+)["']\)/g, (_, id, attr) => {
+      const s = states[id];
+      const v = s && s.attributes ? s.attributes[attr] : undefined;
+      return v === undefined ? 'None' : String(v);
+    });
+    inner = inner.replace(/is_state\(["']([^"']+)["'],\s*["']([^"']+)["']\)/g, (_, id, val) => {
+      const s = states[id];
+      return String(!!(s && s.state === val));
+    });
+    if (/now\(\)\.strftime/.test(inner)) inner = new Date().toTimeString().slice(0, 5);
+    inner = inner.replace(/\s*\|\s*round\(\d+\)\s*$/, '');
+    return inner.trim();
+  }
+
+  const configInfo = {
+    version: '2026.6.1',
+    config_dir: '/config',
+    components: new Array(87).fill('component'),
+    unit_system: { length_unit: 'km' },
+  };
+  const errorLogText = [
+    '2026-07-11 08:12:03 ERROR (MainThread) [homeassistant.components.mqtt] Timeout waiting for MQTT broker',
+    '2026-07-11 09:03:41 WARNING (MainThread) [homeassistant.components.recorder] Database queue over 90%',
+    '2026-07-11 09:44:10 WARNING (MainThread) [homeassistant.components.sensor] Update for sensor.pool_temp took too long',
+    '2026-07-12 06:00:02 ERROR (MainThread) [homeassistant.components.frigate] Connection refused',
+  ].join('\n');
+
+  const hass = {
+    language: 'en',
+    themes: { darkMode: theme === 'dark' },
+    states,
+    services: { homeassistant: { check_config: {} } },
+    connection: { subscribeEvents: () => Promise.resolve(() => {}) },
+    callWS: async () => ({}),
+    callService: async () => ({}),
+    callApi: async (method, path, data) => {
+      if (method === 'POST' && path === 'config/core/check_config') {
+        return { result: 'valid', errors: null, warnings: null };
+      }
+      if (method === 'GET' && path === 'config/automation/config') return automationsConfig;
+      if (method === 'GET' && path === 'config/script/config') return scriptsConfig;
+      if (method === 'GET' && path === 'config') return configInfo;
+      if (method === 'GET' && path === 'config/entity_registry/list') return new Array(142).fill({});
+      if (method === 'GET' && path === 'config/device_registry/list') return new Array(38).fill({});
+      if (method === 'GET' && path === 'config/area_registry/list') return new Array(9).fill({});
+      if (method === 'GET' && path === 'error_log') return errorLogText;
+      if (method === 'GET' && path === 'system_health') return {};
+      if (method === 'POST' && path === 'template') return fakeRenderTemplate(data && data.template);
+      return {};
+    },
+  };
+
+  const card = document.getElementById('card');
+  card.setConfig({ type: 'custom:ha-yaml-checker', title: 'YAML Checker' });
+  card.hass = hass;
+
+  const SAMPLE_YAML = 'automation:\n  - alias: Test\n    trigger:\n      - platform: state\n        entity_id: light.salon\n    action:\n      - service: light.turn_on';
+
+  switch (tab) {
+    case 'entity-validator':
+      card._runEntityValidation();
+      break;
+    case 'file-scanner':
+      card._runFileScan();
+      break;
+    case 'template-tester':
+      card._templateValue = '{{ states("sun.sun") }}';
+      card._runTemplateTester();
+      break;
+    case 'paste-validate':
+      card._pasteValue = SAMPLE_YAML;
+      card._pasteErrors = card._validateYAML(SAMPLE_YAML);
+      card._updateTab('paste-validate');
+      break;
+    case 'common-issues':
+      card._updateTab('common-issues');
+      break;
+    case 'config-check':
+    default:
+      card._runConfigCheck();
+      break;
+  }
+
+  const scrub = () => {
+    try {
+      card.shadowRoot && card.shadowRoot.querySelectorAll('#tip-banner, [class*="banner"], .donate-section').forEach((n) => n.remove());
+    } catch (e) {}
+  };
+  setInterval(scrub, 150);
+  setTimeout(() => { scrub(); document.title = 'READY'; }, 1500);
+})();
+</script>
+</body>
+</html>
