@@ -1,5 +1,9 @@
 # Changelog — YAML Checker
 
+## [4.1.9] - 2026-07-12
+
+- Chore: version header consistency — the v4.1.8 tag shipped with a stale `v4.1.7` header in `ha-yaml-checker.js`; the header now matches the release version. No functional changes.
+
 ## [4.1.8] - 2026-06-27
 
 - Fix: the "Entities" and "Files" tab labels (and the onboarding hint) were hardcoded in Polish ("Encje" / "Pliki"); they now render in English to match the rest of the card's UI.
