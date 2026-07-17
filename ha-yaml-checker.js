@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v4.1.10 (2026-07-12) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v4.1.11 (2026-07-12) — single-tool standalone repo */
 (function() {
 'use strict';
 
