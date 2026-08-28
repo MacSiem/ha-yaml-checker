@@ -1,3 +1,11 @@
+## 4.1.13 (2026-08-28)
+
+- Isolation: persistence is now card-local, removing `window._haToolsPersistence` load-order coupling while retaining existing localStorage keys.
+- Isolation: removed the document-wide sibling-card injector, shared global escape helper, and the remaining runtime discovery dependency.
+- Isolation: Bento styling is component-local and no longer depends on or mutates `window.HAToolsBentoCSS` loaded by another card.
+- UI: the support footer now renders directly inside YAML Checker's own shadow root and survives normal re-renders without a global loader.
+- Security: runtime values are converted to text before local HTML escaping.
+
 ## 4.1.12 (2026-07-18)
 
 - Fix (UI): the small accent dot before section titles no longer detaches from the title text (it was pushed to the opposite edge by the header's flex space-between); it is now pinned next to the title.
