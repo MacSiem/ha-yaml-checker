@@ -7,7 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ha_yaml_checker.const import CARD_URL, DOMAIN, PANEL_URL_PATH, VERSION
+from custom_components.ha_yaml_checker import frontend as yaml_frontend
+from custom_components.ha_yaml_checker.const import DOMAIN, PANEL_URL_PATH
 
 
 async def _setup(hass: HomeAssistant) -> MockConfigEntry:
@@ -23,9 +24,21 @@ async def _setup(hass: HomeAssistant) -> MockConfigEntry:
 async def test_setup_registers_card_resource_and_admin_panel(hass: HomeAssistant) -> None:
     await _setup(hass)
     urls = [item["url"] for item in hass.data["lovelace"].resources.async_items()]
-    assert urls == [f"{CARD_URL}?v={VERSION}"]
+    assert urls == [yaml_frontend.versioned_card_url()]
     panel = hass.data[frontend.DATA_PANELS][PANEL_URL_PATH]
     assert panel.require_admin is True
+
+
+def test_card_url_changes_with_bundled_bytes(tmp_path, monkeypatch) -> None:
+    www = tmp_path / "www"
+    www.mkdir()
+    card = www / yaml_frontend.CARD_FILENAME
+    monkeypatch.setattr(yaml_frontend, "__file__", str(tmp_path / "frontend.py"))
+    card.write_bytes(b"first candidate")
+    first = yaml_frontend.versioned_card_url()
+    card.write_bytes(b"second candidate")
+    second = yaml_frontend.versioned_card_url()
+    assert first != second
 
 
 async def test_existing_hacs_card_resource_is_not_duplicated(hass: HomeAssistant) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -27,8 +28,10 @@ DATA_STATIC = "ha_yaml_checker_static_registered"
 
 
 def versioned_card_url() -> str:
-    """Return the cache-busting URL of the bundled card."""
-    return f"{CARD_URL}?v={VERSION}"
+    """Return a URL that changes whenever the bundled card bytes change."""
+    card_path = Path(__file__).parent / "www" / CARD_FILENAME
+    revision = hashlib.sha256(card_path.read_bytes()).hexdigest()[:12]
+    return f"{CARD_URL}?v={VERSION}&h={revision}"
 
 
 async def async_register_static(hass: HomeAssistant) -> None:
