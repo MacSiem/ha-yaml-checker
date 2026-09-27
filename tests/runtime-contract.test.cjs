@@ -29,6 +29,13 @@ test('failed native config check never becomes PASS through a service acknowledg
   dom.window.close();
 });
 
+test('valid HA top-level automation and script keys are not called deprecated', () => {
+  const { instance, dom } = card();
+  const advice = instance._validateYAML('automation: !include automations.yaml\nscript: !include scripts.yaml\n');
+  assert.equal([...advice.errors, ...advice.warnings].some(row => /Deprecated: (automation|script):/.test(row.msg)), false);
+  dom.window.close();
+});
+
 test('unreadable automation configs cannot be reported as clean references', async () => {
   const { instance, dom } = card();
   instance._hass = {

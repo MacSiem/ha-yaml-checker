@@ -56,5 +56,5 @@ All notable changes to **YAML Checker** are documented here.
 ## Unreleased — integration development branch
 
 - Add an optional integration with an administrator panel, bounded in-memory YAML parsing and top-level file syntax checks. The server returns only status and error location, skips symlinks and `secrets.yaml`, and does not follow includes.
-- Use real Home Assistant WebSocket registry and per-automation configuration commands; report incomplete reads and unsupported script checks instead of green results.
+- Use real Home Assistant WebSocket registry and per-automation configuration commands; report incomplete reads and unsupported script checks instead of green results. Remove incorrect deprecation warnings for valid `automation:` and `script:` configuration keys.
 - Keep native HA configuration validation, server syntax, and client heuristic advice as separate outcomes; escape pasted text and template results in the UI.

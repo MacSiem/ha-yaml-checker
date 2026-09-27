@@ -43,7 +43,7 @@ of its own:
    the same rendering engine used by Developer Tools → Template — and shows
    the rendered result or error.
 6. **Common Issues.** A static reference/cheatsheet tab (indentation,
-   quoting, automations, packages, deprecated syntax, entity/template
+   quoting, automations, packages, possible legacy patterns, entity/template
    gotchas) — no HA call, ships with the card.
 
 ### What is automatic vs. manual

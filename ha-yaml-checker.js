@@ -568,12 +568,6 @@ class HAYamlChecker extends HTMLElement {
       { pattern: /^\s*platform:\s+mqtt$/, msg: 'Deprecated: platform: mqtt \u2014 uzyj mqtt: w configuration.yaml (HA 2022.6+)', severity: 'warning' },
       { pattern: /service:\s+homeassistant\.turn/, msg: 'Info: homeassistant.turn_on/off \u2014 mozesz uzywac domain-specific service', severity: 'info' },
       { pattern: /^\s*condition:\s+template$/, msg: 'Info: condition: template \u2014 rozwaz shorthand template conditions (HA 2023.x+)', severity: 'info' },
-      { pattern: /^\s*automation:\s*$/, msg: 'Deprecated: automation: \u2192 automations: (HA 2024.4+)', severity: 'warning' },
-      { pattern: /^\s*script:\s*$/, msg: 'Deprecated: script: \u2192 scripts: (HA 2024.4+)', severity: 'warning' },
-      { pattern: /^\s*trigger:\s*$/, msg: 'Deprecated: trigger: \u2192 triggers: in automations (HA 2024.4+)', severity: 'warning' },
-      { pattern: /^\s*condition:\s*$/, msg: 'Deprecated: condition: \u2192 conditions: in automations (HA 2024.4+)', severity: 'warning' },
-      { pattern: /^\s*action:\s*$/, msg: 'Deprecated: action: \u2192 actions: in automations (HA 2024.4+)', severity: 'warning' },
-      { pattern: /^\s*platform:\s+time\s*$/, msg: 'Deprecated: platform: time \u2192 time_pattern trigger (HA 2024.x+)', severity: 'warning' },
       { pattern: /^\s*(below|above):\s+['"]/, msg: 'Numeric trigger: below/above jako string \u2014 u\u017Cyj warto\u015Bci numerycznej', severity: 'warning' },
       { pattern: /^\s*entity:\s+\w/, msg: 'Deprecated: entity: \u2192 entity_id: w triggers (HA 2024.x+)', severity: 'warning' },
       { pattern: /^\s*platform:\s+template\s*$/, msg: 'Old format: platform: template \u2192 template: (HA 2021.12+)', severity: 'info' },
@@ -670,7 +664,6 @@ class HAYamlChecker extends HTMLElement {
         cat: 'Deprecated / Stara skladnia',
         items: [
           { title: 'data_template:', desc: 'Od HA 2021.12: uzyj data: z Jinja2 zamiast data_template:', severity: 'warning' },
-          { title: 'trigger/condition/action (lp)', desc: 'Od HA 2024.4: uzyj triggers:/conditions:/actions: (l. mnoga)', severity: 'info' },
           { title: 'initial: on/off', desc: 'Uzyj true/false zamiast on/off', severity: 'warning' },
           { title: 'entity_namespace', desc: 'Usuniety z HA 2022.x', severity: 'error' },
         ]
@@ -773,7 +766,7 @@ class HAYamlChecker extends HTMLElement {
         checkTemplateBtn: 'Check Template',
         templateLabel: 'Template:',
         scanSystemBtn: 'Scan System',
-        entityCheckInfo: 'Scans automations and scripts for references to non-existent entities. Helps find broken entity_id after device name change.',
+        entityCheckInfo: 'Scans readable automations for possible references to non-existent entities. Script configurations are not checked.',
         analyzingEntities: 'Analyzing entities...',
         clickToScanEntities: 'Click the button to scan entities',
         templateTesterInfo: 'Test Jinja2 templates directly via HA API. Same as Dev Tools › Template, but built into the card.',
@@ -862,7 +855,7 @@ class HAYamlChecker extends HTMLElement {
         checkTemplateBtn: 'Check Template',
         templateLabel: 'Template:',
         scanSystemBtn: 'Scan System',
-        entityCheckInfo: 'Scans automations and scripts for references to non-existent entities. Helps find broken entity_id after device name change.',
+        entityCheckInfo: 'Scans readable automations for possible references to non-existent entities. Script configurations are not checked.',
         analyzingEntities: 'Analyzing entities...',
         clickToScanEntities: 'Click the button to scan entities',
         templateTesterInfo: 'Test Jinja2 templates directly via HA API. Same as Dev Tools › Template, but built into the card.',
@@ -1379,14 +1372,6 @@ class HAYamlChecker extends HTMLElement {
           severity: 'info'
         });
       }
-    });
-
-    // Check for common HA mistakes: trigger: instead of triggers:
-    lines.forEach((line, i) => {
-      const t = line.trim();
-      if (t === 'trigger:') warnings.push({ line: i + 1, msg: this._lang === 'pl' ? 'HA 2024.4+: u\u017Cyj "triggers:" zamiast "trigger:" (starszy format)' : this._t.triggerOldFormat, severity: 'info' });
-      if (t === 'condition:') warnings.push({ line: i + 1, msg: this._lang === 'pl' ? 'HA 2024.4+: u\u017Cyj "conditions:" zamiast "condition:" (starszy format)' : this._t.conditionOldFormat, severity: 'info' });
-      if (t === 'action:') warnings.push({ line: i + 1, msg: this._lang === 'pl' ? 'HA 2024.4+: u\u017Cyj "actions:" zamiast "action:" (starszy format)' : this._t.actionOldFormat, severity: 'info' });
     });
 
     // Deprecated syntax (F4)

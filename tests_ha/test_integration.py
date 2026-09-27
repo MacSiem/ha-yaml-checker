@@ -32,7 +32,7 @@ async def test_existing_hacs_card_resource_is_not_duplicated(hass: HomeAssistant
     assert await async_setup_component(hass, "lovelace", {})
     resources = hass.data["lovelace"].resources
     await resources.async_load()
-    await resources.async_create_item({"res_type": "module", "url": "/hacsfiles/ha-automation-analyzer/ha-automation-analyzer.js"})
+    await resources.async_create_item({"res_type": "module", "url": "/hacsfiles/ha-yaml-checker/ha-yaml-checker.js"})
     await _setup(hass)
     assert len(list(resources.async_items())) == 1
 
