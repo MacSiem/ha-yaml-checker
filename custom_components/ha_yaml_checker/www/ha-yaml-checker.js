@@ -1169,8 +1169,8 @@ class HAYamlChecker extends HTMLElement {
       const haVersion = configInfo.version || '?';
 
       // Try to get log tail for errors
-      let logErrors = 0;
-      let logWarnings = 0;
+      let logErrors = '?';
+      let logWarnings = '?';
       try {
         const logs = await this._hass.callApi('GET', 'error_log');
         if (typeof logs === 'string') {
@@ -1190,6 +1190,17 @@ class HAYamlChecker extends HTMLElement {
         }
       } catch(e) { /* no system_health */ }
 
+      let scannedFiles = null;
+      if (this._hass?.user?.is_admin && this._hass?.config?.components?.includes('ha_yaml_checker')) {
+        try {
+          const result = await this._hass.callWS({ type: 'ha_yaml_checker/scan_files' });
+          if (result?.schema === 'ha-yaml-file-scan-v1' && result.scope === 'top_level_syntax_only'
+            && Array.isArray(result.files) && result.files.length <= HAYamlChecker.KEY_FILES.length) {
+            scannedFiles = new Map(result.files.filter(row => row && typeof row.file === 'string'
+              && ['pass', 'fail', 'skipped'].includes(row.status)).map(row => [row.file, row]));
+          }
+        } catch (_) { /* file syntax stays unknown */ }
+      }
       this._scanResult = {
         haVersion,
         entityCount: entityCount ?? '?',
@@ -1201,7 +1212,9 @@ class HAYamlChecker extends HTMLElement {
         components: configInfo.components ? configInfo.components.length : '?',
         unit: configInfo.unit_system ? configInfo.unit_system.length_unit || 'km' : '?',
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
-        files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: 'unknown' })),
+        files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: scannedFiles?.get(f.path)?.status || 'unknown',
+          reason: scannedFiles?.get(f.path)?.reason, line: scannedFiles?.get(f.path)?.line,
+          column: scannedFiles?.get(f.path)?.column })),
       };
     } catch (e) {
       this._scanResult = {
@@ -1839,11 +1852,11 @@ ${this._css()}
               <div class="file-path">${this._esc(f.path)}${f.critical ? '<span class="badge critical">' + this._t.critical + '</span>' : ''}</div>
               <div class="file-desc">${this._esc(f.desc)}</div>
             </div>
-            <span class="file-status-icon" title="${this._lang === 'pl' ? 'Nieznany (HA API nie zwraca listy plik\u00F3w YAML)' : 'Unknown (HA API does not return YAML file list)'}">\u2753</span>
+            <span class="file-status-icon" title="${this._esc(f.reason || (f.status === 'pass' ? 'Top-level YAML syntax only; includes not followed' : f.status))}">${f.status === 'pass' ? '✅' : f.status === 'fail' ? '❌' : f.status === 'skipped' ? '➖' : '❓'} ${this._esc(f.status)}${f.status === 'fail' && Number.isInteger(f.line) ? ` ${f.line}${Number.isInteger(f.column) ? `:${f.column}` : ''}` : ''}</span>
           </div>
         `).join('')}
       </div>
-      <div class="note-box" style="margin-top:12px;">💡 ${this._t.fileHint}</div>
+      <div class="note-box" style="margin-top:12px;">💡 ${this._lang === 'pl' ? 'Status pliku dotyczy tylko składni YAML na najwyższym poziomie; !include i poprawność konfiguracji HA wymagają osobnego sprawdzenia. secrets.yaml nie jest czytany.' : 'File status covers top-level YAML syntax only; !include and HA configuration validity require a separate check. secrets.yaml is never read.'}</div>
     `;
   }
 

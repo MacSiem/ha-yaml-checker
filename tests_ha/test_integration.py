@@ -56,3 +56,12 @@ async def test_syntax_returns_only_status_and_location(hass: HomeAssistant, hass
     assert result["schema"] == "ha-yaml-syntax-v1"
     assert result["status"] == "invalid"
     assert "PRIVATE-CANARY" not in repr(result)
+
+
+async def test_file_scan_is_admin_only(hass: HomeAssistant, hass_ws_client, hass_read_only_access_token) -> None:
+    await _setup(hass)
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/scan_files"})
+    response = await client.receive_json()
+    assert response["success"] is False
+    assert response["error"]["code"] == "unauthorized"

@@ -72,3 +72,24 @@ test('system inventory reads native WebSocket registries, not nonexistent REST r
   assert.equal(instance._scanResult.entityCount, 2);
   dom.window.close();
 });
+
+test('server file statuses are kept separate from HA config validity', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true }, config: { components: ['ha_yaml_checker'] },
+    callWS: async message => message.type === 'ha_yaml_checker/scan_files'
+      ? { schema: 'ha-yaml-file-scan-v1', scope: 'top_level_syntax_only', files: [
+        { file: 'configuration.yaml', status: 'pass' },
+        { file: 'automations.yaml', status: 'fail', line: 2, column: 4 },
+        { file: 'secrets.yaml', status: 'skipped', reason: 'secret_file' },
+      ] } : [],
+    callApi: async (_method, route) => route === 'config' ? { version: '2026.9.3' } : '',
+  };
+  await instance._runFileScan();
+  const rows = Object.fromEntries(instance._scanResult.files.map(row => [row.path, row]));
+  assert.equal(rows['configuration.yaml'].status, 'pass');
+  assert.equal(rows['automations.yaml'].status, 'fail');
+  assert.equal(rows['secrets.yaml'].status, 'skipped');
+  assert.equal(instance._checkResult, null);
+  dom.window.close();
+});

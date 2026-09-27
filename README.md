@@ -5,8 +5,8 @@
 Inspect Home Assistant configuration from a Lovelace card — run HA's own
 config check, find possible broken references in readable automations,
 review system inventory, lint pasted YAML, and test Jinja2 templates.
-The optional integration adds an administrator panel and a real, on-demand
-YAML syntax parser for pasted text.
+The optional integration adds an administrator panel, a real parser for
+pasted text, and on-demand top-level file syntax checks.
 
 [![Version](https://img.shields.io/github/v/release/MacSiem/ha-yaml-checker)](https://github.com/MacSiem/ha-yaml-checker/releases) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -24,15 +24,16 @@ of its own:
    concurrency. It reports candidate references from readable automations;
    unreadable configs and script configs are marked incomplete/unsupported.
    The reference scan is heuristic, not HA's full config validation.
-3. **System inventory.** Calls `GET config` and native WebSocket entity,
-   device and area registry list commands for
+3. **System inventory and file syntax.** Calls `GET config` and native
+   WebSocket entity, device and area registry list commands for
    HA version, entity/device/area counts, config directory and component
    count, plus `GET error_log` for a rough error/warning tally. It also lists
    the key YAML files (`configuration.yaml`, `automations.yaml`,
-   `scripts.yaml`, etc.) by name — their per-file status is shown as
-   "unknown" because the HA REST API doesn't expose individual YAML file
-   contents or checksums; this tab is a system-info summary, not a live
-   file-by-file check.
+   `scripts.yaml`, etc.) by name. With the integration, administrators can
+   parse only these allowlisted top-level files on the HA server. Each file
+   gets `pass`, `fail`, or `skipped` with an error location but no content.
+   `secrets.yaml` is never read. Includes are not followed; this is syntax,
+   not a replacement for HA's aggregate Config Check.
 4. **Paste & Validate.** Client-side heuristic advice is shown separately
    from YAML syntax. With the integration installed, an administrator can
    request syntax parsing inside HA; the parser returns only status and an
@@ -111,9 +112,10 @@ No. Add the card and use the tabs — each check runs on demand against your
 own HA instance.
 
 **Why does the File Scanner show every config file as "unknown" status?**
-Home Assistant's API doesn't expose contents or validity of individual YAML
-files through these commands. The tab lists standard filenames as a reference;
-use Config Check for HA's aggregate validation.
+The standalone Dashboard card has no file access, so statuses are unknown.
+The integration parses an allowlist of top-level files inside HA and reports
+only syntax status. It never reads `secrets.yaml` or follows includes. Use
+Config Check for HA's aggregate configuration validation.
 
 **Does the Entity Validator check every entity in Home Assistant?**
 It checks candidate references in automation configurations HA permits the
@@ -126,7 +128,8 @@ No external telemetry. Calls go only to your own Home Assistant instance
 over its existing connection, including `config/core/check_config`, native
 registry WebSocket commands, and `template`. The integration's pasted YAML
 parser runs in memory, requires administrator access, and returns no source
-text. There's no analytics, and no
+text. The file scanner returns only fixed filenames and syntax status. There's
+no analytics, and no
 CDN-hosted fonts or scripts — the Bento CSS design system and the XSS-escape
 helper are bundled inline in the single JS file. The only outbound links in
 the card are the "Buy Me a Coffee" and "PayPal" support buttons, which only
