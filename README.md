@@ -62,9 +62,9 @@ of its own:
 |---|---|
 | ![Config Check, light theme](docs/screenshots/card-main-light.png) | ![Config Check, dark theme](docs/screenshots/card-main-dark.png) |
 
-*Default view: the Config Check tab after running HA's built-in validator —
-a passing result with the timestamp of the last run. Dark mode follows your
-Home Assistant theme automatically.*
+*Default view with a synthetic successful Config Check result and timestamp.
+The card identifies HA's built-in validator. Dark mode follows your Home
+Assistant theme.*
 
 ## Installation
 
