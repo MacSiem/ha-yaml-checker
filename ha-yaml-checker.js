@@ -935,31 +935,21 @@ class HAYamlChecker extends HTMLElement {
         return [{ message: JSON.stringify(raw) }];
       };
       this._checkResult = {
-        ok: result.result === 'valid',
+        ok: result.result === 'valid' ? true : result.result === 'invalid' ? false : null,
         errors: parseMessages(rawErrors),
         warnings: parseMessages(rawWarnings),
         raw: result,
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
       };
     } catch (e) {
-      try {
-        await this._hass.callService('homeassistant', 'check_config', {});
-        this._checkResult = {
-          ok: true,
-          errors: [],
-          warnings: [],
-          ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
-          note: this._lang === 'pl' ? 'Sprawdzenie przez service (bez szczeg\u00F3\u0142\u00F3w b\u0142\u0119d\u00F3w)' : 'Checked via service (without error details)',
-        };
-      } catch (e2) {
-        this._checkResult = {
-          ok: false,
-          errors: [{ message: e.message || String(e) }],
-          warnings: [],
-          ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
-          apiError: true,
-        };
-      }
+      this._checkResult = {
+        ok: null,
+        errors: [],
+        warnings: [],
+        ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
+        note: this._lang === 'pl' ? 'Nie udało się uruchomić natywnej walidacji HA; wynik nieznany.' : 'Home Assistant validation could not run; result unknown.',
+        apiError: true,
+      };
     }
     this._checkLoading = false;
     this._updateTab('config-check');
@@ -977,26 +967,23 @@ class HAYamlChecker extends HTMLElement {
       const states = this._hass.states;
       const allEntityIds = new Set(Object.keys(states));
 
-      // Fetch automations via REST
-      let automations = [];
-      try {
-        automations = await this._hass.callApi('GET', 'config/automation/config');
-        if (!Array.isArray(automations)) automations = [];
-      } catch (e) {
-        // Fallback: filter states for automation.*
-        automations = Object.values(states)
-          .filter(s => s.entity_id.startsWith('automation.'))
-          .map(s => ({ id: s.entity_id, alias: s.attributes.friendly_name || s.entity_id }));
-      }
-
-      // Fetch scripts
-      let scripts = [];
-      try {
-        scripts = await this._hass.callApi('GET', 'config/script/config');
-        if (typeof scripts === 'object' && !Array.isArray(scripts)) {
-          scripts = Object.entries(scripts).map(([id, cfg]) => ({ id, ...cfg }));
+      // The native command is per automation. A failed read must not turn into
+      // a green "no broken references" result.
+      const automationIds = Object.keys(states).filter(id => id.startsWith('automation.'));
+      const automations = [];
+      let unreadableAutomations = 0;
+      if (this._hass.user?.is_admin) {
+        for (let offset = 0; offset < automationIds.length; offset += 8) {
+          const batch = await Promise.all(automationIds.slice(offset, offset + 8).map(async entityId => {
+            try {
+              const response = await this._hass.callWS({ type: 'automation/config', entity_id: entityId });
+              return response?.config && typeof response.config === 'object' ? response.config : null;
+            } catch (_) { return null; }
+          }));
+          for (const config of batch) config ? automations.push(config) : unreadableAutomations++;
         }
-      } catch (e) { /* ok */ }
+      } else unreadableAutomations = automationIds.length;
+      const scripts = [];
 
       // Count domain stats
       const domainCounts = {};
@@ -1135,8 +1122,10 @@ class HAYamlChecker extends HTMLElement {
 
       this._entityResult = {
         totalEntities: allEntityIds.size,
-        totalAutomations: automations.length,
-        totalScripts: scripts.length,
+        totalAutomations: automationIds.length,
+        totalScripts: Object.keys(states).filter(id => id.startsWith('script.')).length,
+        unreadableAutomations,
+        scriptConfigStatus: 'unsupported',
         domainCounts,
         broken: brokenUniq,
         dupIds,
@@ -1166,13 +1155,16 @@ class HAYamlChecker extends HTMLElement {
 
     try {
       const configInfo = await this._hass.callApi('GET', 'config');
-      const entityReg = await this._hass.callApi('GET', 'config/entity_registry/list');
-      const deviceReg = await this._hass.callApi('GET', 'config/device_registry/list');
-      const areaReg = await this._hass.callApi('GET', 'config/area_registry/list');
+      const registry = async type => {
+        try { const rows = await this._hass.callWS({ type }); return Array.isArray(rows) ? rows.length : null; }
+        catch (_) { return null; }
+      };
+      const [entityCount, deviceCount, areaCount] = await Promise.all([
+        registry('config/entity_registry/list'),
+        registry('config/device_registry/list'),
+        registry('config/area_registry/list'),
+      ]);
       const haVersion = configInfo.version || '?';
-      const entityCount = Array.isArray(entityReg) ? entityReg.length : '?';
-      const deviceCount = Array.isArray(deviceReg) ? deviceReg.length : '?';
-      const areaCount = Array.isArray(areaReg) ? areaReg.length : '?';
 
       // Try to get log tail for errors
       let logErrors = 0;
@@ -1198,9 +1190,9 @@ class HAYamlChecker extends HTMLElement {
 
       this._scanResult = {
         haVersion,
-        entityCount,
-        deviceCount,
-        areaCount,
+        entityCount: entityCount ?? '?',
+        deviceCount: deviceCount ?? '?',
+        areaCount: areaCount ?? '?',
         logErrors,
         logWarnings,
         configDir: configInfo.config_dir || '?',
@@ -1667,9 +1659,10 @@ ${this._css()}
   }
 
   _renderCheckResult(r) {
-    const cls = r.ok ? 'success' : 'error';
-    const icon = r.ok ? '✅' : '❌';
-    const label = r.ok ? this._t.configOk : this._t.configError;
+    const cls = r.ok === true ? 'success' : r.ok === false ? 'error' : 'warning';
+    const icon = r.ok === true ? '✅' : r.ok === false ? '❌' : '⚠️';
+    const label = r.ok === true ? this._t.configOk : r.ok === false ? this._t.configError
+      : (this._lang === 'pl' ? 'Wynik walidacji HA nieznany' : 'Home Assistant validation result unknown');
     return `
       <div class="result-header ${cls}">
         <span class="result-icon">${icon}</span>
@@ -1684,7 +1677,7 @@ ${this._css()}
       ${r.warnings.length ? `<div class="issue-section"><h3>${this._t.warnings} (${r.warnings.length})</h3>
         ${r.warnings.map(w => `<div class="issue-item warning"><span class="issue-icon">⚠️</span><div>${this._esc(w.message || JSON.stringify(w))}</div></div>`).join('')}
       </div>` : ''}
-      ${r.ok && !r.errors.length && !r.warnings.length ? `<div class="all-good">✅ ${this._t.allOk}</div>` : ''}
+      ${r.ok === true && !r.errors.length && !r.warnings.length ? `<div class="all-good">✅ ${this._t.allOk}</div>` : ''}
     `;
   }
 
@@ -1735,12 +1728,14 @@ ${this._css()}
           ${r.dupIds.map(d => `<div class="issue-item warning"><span class="issue-icon">⚠️</span><div><strong>${this._esc(d.id)}</strong> — ${this._esc(d.alias)}</div></div>`).join('')}
         </div>
       ` : ''}
+      ${r.unreadableAutomations ? `<div class="note-box">⚠️ ${this._lang === 'pl' ? 'Nie odczytano konfiguracji' : 'Could not read configuration for'} ${r.unreadableAutomations} ${this._lang === 'pl' ? 'automatyzacji; lista referencji jest niepełna.' : 'automations; reference results are incomplete.'}</div>` : ''}
+      <div class="note-box">ℹ️ ${this._lang === 'pl' ? 'Konfiguracje skryptów nie są dostępne przez użyty interfejs; referencje skryptów nie zostały zweryfikowane.' : 'Script configuration is unavailable through this interface; script references were not checked.'}</div>
       ${r.broken.length ? `
         <div class="issue-section">
           <h3>❌ ${this._t.brokenRefsTitle} (${r.broken.length})</h3>
           ${r.broken.map(b => `<div class="issue-item error"><span class="issue-icon">❌</span><div><strong>${this._esc(b.entity)}</strong> <span style="color:var(--text-secondary);font-size:11px;">w ${this._esc(b.type)}: ${this._esc(b.in)}</span></div></div>`).join('')}
         </div>
-      ` : '<div class="all-good">✅ ' + this._t.noRefs + '</div>'}
+      ` : r.unreadableAutomations ? '' : '<div class="all-good">✅ ' + this._t.noRefs + ' (automation config)</div>'}
       ${r.problemStates?.length ? `
         <div class="issue-section">
           <h3>⚠️ ${this._t.unavailableTitle} (${r.problemStates.length})</h3>
@@ -1834,7 +1829,7 @@ ${this._css()}
             <span class="paste-label">📝 ${this._t.pasteYamlLabel}</span>
             <button class="btn btn-sm" id="btn-clear-paste">${this._t.clearBtn}</button>
           </div>
-          <textarea class="yaml-textarea" id="yaml-input" placeholder="# ${this._t.pasteHint}\nautomation:\n  - alias: Test\n    trigger:\n      - platform: state\n        entity_id: light.salon">${this._pasteValue}</textarea>
+          <textarea class="yaml-textarea" id="yaml-input" placeholder="# ${this._t.pasteHint}\nautomation:\n  - alias: Test\n    trigger:\n      - platform: state\n        entity_id: light.salon">${this._esc(this._pasteValue)}</textarea>
           <button class="btn btn-primary" id="btn-validate" aria-label="${this._t.validateBtn || 'Validate YAML'}">🔍 ${this._t.validateBtn}</button>
           ${this._pasteErrors && (errors.length || warnings.length) ? `
             <div class="paste-results">
@@ -1853,7 +1848,7 @@ ${this._css()}
               `).join('')}
             </div>
           ` : ''}
-          ${this._pasteErrors && !errors.length && !warnings.length && this._pasteValue ? '<div class="all-good">✅ Brak wykrytych problem\u00F3w!</div>' : ''}
+          ${this._pasteErrors && !errors.length && !warnings.length && this._pasteValue ? '<div class="note-box">ℹ️ No heuristic warnings detected. YAML syntax has not been parsed.</div>' : ''}
         </div>
       </div>
     `;
@@ -1870,7 +1865,7 @@ ${this._css()}
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
             <div class="paste-label" style="margin-bottom:6px;">${this._t.jinja2Template}</div>
-            <textarea class="yaml-textarea" id="template-input" style="min-height:120px;" placeholder="{{ states('sun.sun') }}">${this._templateValue}</textarea>
+            <textarea class="yaml-textarea" id="template-input" style="min-height:120px;" placeholder="{{ states('sun.sun') }}">${this._esc(this._templateValue)}</textarea>
           </div>
           ${this._templateLoading ? '<div class="loading-wrap"><div class="spinner"></div> ' + this._t.executingTemplate + '</div>' : ''}
           ${!this._templateLoading && r ? `
@@ -1881,8 +1876,8 @@ ${this._css()}
                 <small>${r.ts}</small>
               </div>
             </div>
-            ${r.ok ? `<div style="background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;word-break:break-all;">${String(r.value)}</div>` : ''}
-            ${!r.ok ? `<div class="error-box">${r.error}</div>` : ''}
+            ${r.ok ? `<div style="background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;word-break:break-all;">${this._esc(String(r.value))}</div>` : ''}
+            ${!r.ok ? `<div class="error-box">${this._esc(r.error)}</div>` : ''}
           ` : ''}
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-primary" id="btn-template" aria-label="${this._t.executeTemplate || 'Execute template'}">▶️ ${this._t.executeTemplate}</button>
