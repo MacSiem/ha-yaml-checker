@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v4.1.13 (2026-08-28) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v5.0.0 — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -9,7 +9,7 @@ const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = 
 const _esc = ((s) => String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 /**
- * HA YAML Checker v3.0
+ * HA YAML Checker v5.0.0
  * Advanced YAML validator for Home Assistant configuration files.
  * Part of HA Tools Panel - Debug category
  * Author: Jeff (AI) for MacSiem
@@ -1615,7 +1615,7 @@ ${this._css()}
         <div class="card-header">
           <span class="card-title-icon">🔍</span>
           <h2>YAML Checker</h2>
-          <span class="version-badge">v3.0</span>
+          <span class="version-badge">v5.0.0</span>
         
         </div>
         <div class="tabs" id="tabs" role="tablist">
