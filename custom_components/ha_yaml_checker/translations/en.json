@@ -1,0 +1,4 @@
+{
+  "config": {"step": {"user": {"title": "YAML Checker", "description": "Add the read-only YAML Checker panel and dashboard card."}}},
+  "options": {"step": {"init": {"title": "YAML Checker options", "data": {"show_panel": "Show sidebar panel"}}}}
+}

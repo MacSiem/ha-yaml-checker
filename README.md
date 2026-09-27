@@ -2,11 +2,11 @@
 
 ![Preview](banner.png)
 
-Validate Home Assistant YAML configuration from a Lovelace card — run HA's
-own config check, find broken entity references in your automations and
-scripts, inspect key config files, lint pasted YAML client-side, and test
-Jinja2 templates. Zero configuration: add the card and every tab works
-against your own running Home Assistant instance.
+Inspect Home Assistant configuration from a Lovelace card — run HA's own
+config check, find possible broken references in readable automations,
+review system inventory, lint pasted YAML, and test Jinja2 templates.
+The optional integration adds an administrator panel and a real, on-demand
+YAML syntax parser for pasted text.
 
 [![Version](https://img.shields.io/github/v/release/MacSiem/ha-yaml-checker)](https://github.com/MacSiem/ha-yaml-checker/releases) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -17,17 +17,15 @@ on-demand against your live HA instance — the card holds no config options
 of its own:
 
 1. **Config Check.** Calls HA's built-in validator (`POST
-   config/core/check_config`, falling back to the `homeassistant.check_config`
-   service if the REST endpoint is unavailable) and shows the same
-   errors/warnings HA itself would report.
-2. **Entity Validator.** Reads `hass.states` plus `GET
-   config/automation/config` and `GET config/script/config`, then
-   cross-references every `entity_id` referenced inside automations and
-   scripts against your real entities. Reports broken references, duplicate
-   automation IDs, unavailable/unknown entities, missing automation
-   descriptions, and dangling `script.*`/`scene.*`/`input_*` references.
-3. **File Scanner.** Calls `GET config`, `GET config/entity_registry/list`,
-   `GET config/device_registry/list` and `GET config/area_registry/list` for
+   config/core/check_config`) and shows its result. If the call fails,
+   the status is unknown; a service acknowledgement is never treated as PASS.
+2. **Entity Validator.** Reads `hass.states` and the native administrator
+   `automation/config` WebSocket command per automation, with bounded
+   concurrency. It reports candidate references from readable automations;
+   unreadable configs and script configs are marked incomplete/unsupported.
+   The reference scan is heuristic, not HA's full config validation.
+3. **System inventory.** Calls `GET config` and native WebSocket entity,
+   device and area registry list commands for
    HA version, entity/device/area counts, config directory and component
    count, plus `GET error_log` for a rough error/warning tally. It also lists
    the key YAML files (`configuration.yaml`, `automations.yaml`,
@@ -35,11 +33,11 @@ of its own:
    "unknown" because the HA REST API doesn't expose individual YAML file
    contents or checksums; this tab is a system-info summary, not a live
    file-by-file check.
-4. **Paste & Validate.** Fully client-side YAML linting for anything you
-   paste in — indentation/tabs, unquoted special characters, deprecated
-   patterns (`data_template:`, `entity_namespace:`, `initial: on/off`, the
-   HA 2024.4 `trigger:`/`condition:`/`action:` → plural key migration, and
-   more). No Home Assistant call is made for this tab.
+4. **Paste & Validate.** Client-side heuristic advice is shown separately
+   from YAML syntax. With the integration installed, an administrator can
+   request syntax parsing inside HA; the parser returns only status and an
+   error location, without storing or echoing pasted text. The standalone
+   dashboard card marks syntax unverified.
 5. **Template Tester.** Sends your Jinja2 expression to `POST template` —
    the same rendering engine used by Developer Tools → Template — and shows
    the rendered result or error.
@@ -69,10 +67,18 @@ Home Assistant theme automatically.*
 
 ## Installation
 
+The currently published HACS package is a Dashboard card:
+
 1. Open HACS → Custom repositories.
-2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**
-   (Lovelace plugin).
+2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**.
 3. Install **YAML Checker** and reload your browser.
+
+The integration package is prepared on the development branch. For manual
+development installation, copy `custom_components/ha_yaml_checker` to
+`<config>/custom_components/`, restart HA, then add **YAML Checker** under
+Settings → Devices & services. It registers the card and an optional
+administrator sidebar panel. HACS integration installation requires the
+repository category change to be accepted first.
 
 ## Quick start
 
@@ -105,22 +111,22 @@ No. Add the card and use the tabs — each check runs on demand against your
 own HA instance.
 
 **Why does the File Scanner show every config file as "unknown" status?**
-Home Assistant's REST API doesn't expose the contents or validity of
-individual YAML files, only aggregate info (version, entity/device/area
-counts, error log). The File Scanner lists the standard files as a
-reference; use the Config Check tab for an actual pass/fail validation.
+Home Assistant's API doesn't expose contents or validity of individual YAML
+files through these commands. The tab lists standard filenames as a reference;
+use Config Check for HA's aggregate validation.
 
 **Does the Entity Validator check every entity in Home Assistant?**
-It checks entity references found inside your automations and scripts
-against the full list of known entities (`hass.states`), plus flags
-unavailable/unknown entities and automations without a description. It
-doesn't parse `scenes.yaml`, `groups.yaml` or Lovelace YAML directly.
+It checks candidate references in automation configurations HA permits the
+administrator to read against `hass.states`. Missing or unreadable configs
+make the result incomplete. Script configurations are not scanned. It does
+not parse `scenes.yaml`, `groups.yaml` or Lovelace YAML directly.
 
 **Does this send data anywhere?**
-No. Every tab talks only to your own Home Assistant instance over the
-connection your browser already has (REST endpoints such as
-`config/core/check_config`, `config/automation/config`, entity/device/area
-registries, and `template`). There's no telemetry, no analytics, and no
+No external telemetry. Calls go only to your own Home Assistant instance
+over its existing connection, including `config/core/check_config`, native
+registry WebSocket commands, and `template`. The integration's pasted YAML
+parser runs in memory, requires administrator access, and returns no source
+text. There's no analytics, and no
 CDN-hosted fonts or scripts — the Bento CSS design system and the XSS-escape
 helper are bundled inline in the single JS file. The only outbound links in
 the card are the "Buy Me a Coffee" and "PayPal" support buttons, which only

@@ -1,0 +1,14 @@
+{
+  "domain": "ha_yaml_checker",
+  "name": "YAML Checker",
+  "codeowners": ["@MacSiem"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "lovelace", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/MacSiem/ha-yaml-checker",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/MacSiem/ha-yaml-checker/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "5.0.0"
+}

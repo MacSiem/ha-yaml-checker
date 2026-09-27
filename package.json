@@ -3,6 +3,7 @@
   "version": "0.0.0-private",
   "private": true,
   "scripts": {
+    "test": "node --test tests/runtime-contract.test.cjs && npm run test:smoke",
     "test:smoke": "node .github/smoke.cjs"
   },
   "devDependencies": {
