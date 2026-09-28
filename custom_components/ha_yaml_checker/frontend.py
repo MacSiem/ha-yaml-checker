@@ -27,10 +27,12 @@ _LOGGER = logging.getLogger(__name__)
 DATA_STATIC = "ha_yaml_checker_static_registered"
 
 
-def versioned_card_url() -> str:
+async def versioned_card_url(hass: HomeAssistant) -> str:
     """Return a URL that changes whenever the bundled card bytes change."""
     card_path = Path(__file__).parent / "www" / CARD_FILENAME
-    revision = hashlib.sha256(card_path.read_bytes()).hexdigest()[:12]
+    revision = await hass.async_add_executor_job(
+        lambda: hashlib.sha256(card_path.read_bytes()).hexdigest()[:12]
+    )
     return f"{CARD_URL}?v={VERSION}&h={revision}"
 
 
@@ -82,7 +84,7 @@ async def async_register_card(hass: HomeAssistant) -> str:
     added so the element is not loaded twice. YAML-mode dashboards fall back to
     ``add_extra_js_url``. Returns how the card was registered.
     """
-    url = versioned_card_url()
+    url = await versioned_card_url(hass)
     resources = _resources(hass)
     if resources is not None and hasattr(resources, "async_create_item") and _lovelace_mode(hass) != "yaml":
         if not getattr(resources, "loaded", True):
@@ -134,7 +136,7 @@ async def async_register_panel(hass: HomeAssistant) -> bool:
         webcomponent_name=CARD_ELEMENT,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        module_url=versioned_card_url(),
+        module_url=await versioned_card_url(hass),
         embed_iframe=False,
         require_admin=True,
         config={},
