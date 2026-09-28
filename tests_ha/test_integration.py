@@ -24,20 +24,20 @@ async def _setup(hass: HomeAssistant) -> MockConfigEntry:
 async def test_setup_registers_card_resource_and_admin_panel(hass: HomeAssistant) -> None:
     await _setup(hass)
     urls = [item["url"] for item in hass.data["lovelace"].resources.async_items()]
-    assert urls == [yaml_frontend.versioned_card_url()]
+    assert urls == [await yaml_frontend.versioned_card_url(hass)]
     panel = hass.data[frontend.DATA_PANELS][PANEL_URL_PATH]
     assert panel.require_admin is True
 
 
-def test_card_url_changes_with_bundled_bytes(tmp_path, monkeypatch) -> None:
+async def test_card_url_changes_with_bundled_bytes(hass: HomeAssistant, tmp_path, monkeypatch) -> None:
     www = tmp_path / "www"
     www.mkdir()
     card = www / yaml_frontend.CARD_FILENAME
     monkeypatch.setattr(yaml_frontend, "__file__", str(tmp_path / "frontend.py"))
     card.write_bytes(b"first candidate")
-    first = yaml_frontend.versioned_card_url()
+    first = await yaml_frontend.versioned_card_url(hass)
     card.write_bytes(b"second candidate")
-    second = yaml_frontend.versioned_card_url()
+    second = await yaml_frontend.versioned_card_url(hass)
     assert first != second
 
 
