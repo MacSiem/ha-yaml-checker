@@ -149,3 +149,9 @@ The optional in-card support link is shown only to administrators. Dismiss it in
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Privacy and data
+
+The card can validate pasted YAML and, with the integration, request allowed server-side configuration checks. YAML may contain credentials and private entity identifiers. Do not paste secrets into public issues; share a small synthetic example. A syntax result does not prove that every dependency or referenced entity is valid.
+
+See [SECURITY.md](SECURITY.md) for safe vulnerability reporting and [NOTICE](NOTICE) for licensing notices.
