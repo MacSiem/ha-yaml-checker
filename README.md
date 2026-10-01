@@ -78,8 +78,15 @@ The integration package is prepared on the development branch. For manual
 development installation, copy `custom_components/ha_yaml_checker` to
 `<config>/custom_components/`, restart HA, then add **YAML Checker** under
 Settings → Devices & services. It registers the card and an optional
-administrator sidebar panel. HACS integration installation requires the
-repository category change to be accepted first.
+administrator sidebar panel. HACS integration installation requires a
+published integration package and an accepted category change.
+
+Keep your working Dashboard plugin, its resources, and existing card configuration
+while trying the integration. In storage mode the integration reuses the existing
+card resource. Check that your dashboards still work and the integration is loaded
+before retiring the plugin. The public plugin remains available until the
+integration release and migration have been verified. A category change alone
+is not a verified migration.
 
 ## Quick start
 
