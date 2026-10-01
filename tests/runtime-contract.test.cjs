@@ -100,3 +100,21 @@ test('server file statuses are kept separate from HA config validity', async () 
   assert.equal(instance._checkResult, null);
   dom.window.close();
 });
+
+
+test('nested YAML values and indentless sequences are not empty-key warnings', () => {
+  const { instance, dom } = card();
+  for (const yaml of [
+    'homeassistant:\n  name: "HA Tools QA YAML"\n',
+    'homeassistant:\n  # comment\n\n  customize:\n    sensor.example:\n      friendly_name: Example\n',
+    'automation:\n- alias: Example\n  trigger: []\n  action: []\n',
+  ]) {
+    const advice = instance._validateYAML(yaml);
+    assert.equal(advice.warnings.some(row => /Empty value|Pusta warto/.test(row.msg)), false, yaml);
+  }
+  for (const yaml of ['foo:\nbar: value\n', 'foo:\n# only comment\n', 'parent:\n  foo:\n  bar: value\n']) {
+    const advice = instance._validateYAML(yaml);
+    assert.equal(advice.warnings.some(row => /Empty value|Pusta warto/.test(row.msg)), true, yaml);
+  }
+  dom.window.close();
+});
