@@ -2,6 +2,7 @@
 
 - Correct empty-value hints for nested mappings and block sequences, including indentless sequences. Truly null values still receive a hint.
 - Align the standalone frontend version label with the integration package.
+- Respect the configured card title, escape it as text, and wrap long titles within narrow Sections cards.
 
 ## 4.1.13 (2026-08-28)
 

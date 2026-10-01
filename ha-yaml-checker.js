@@ -1622,7 +1622,7 @@ ${this._css()}
       <div class="card">
         <div class="card-header">
           <span class="card-title-icon">🔍</span>
-          <h2>YAML Checker</h2>
+          <h2>${this._esc(this._config.title || "YAML Checker")}</h2>
           <span class="version-badge">v5.0.0</span>
         
         </div>
@@ -2062,7 +2062,7 @@ ${this._css()}
       .card { background: var(--bg); border-radius: var(--radius); overflow: visible; font-family: 'Inter', -apple-system, sans-serif; color: var(--text); }
       .card-header { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
       .card-title-icon { font-size: 22px; }
-      .card-header h2 { margin: 0; font-size: 16px; font-weight: 700; flex: 1; }
+      .card-header h2 { margin: 0; font-size: 16px; font-weight: 700; flex: 1; min-width: 0; overflow-wrap: anywhere; }
       .version-badge { font-size: 11px; background: rgba(59,130,246,0.1); color: var(--primary); border: 1px solid rgba(59,130,246,0.3); border-radius: 20px; padding: 2px 8px; font-weight: 600; }
       .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
       .tabs::-webkit-scrollbar { display: none; }
