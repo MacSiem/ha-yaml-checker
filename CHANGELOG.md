@@ -1,3 +1,8 @@
+## 5.0.0 — integration candidate (2026-10-01)
+
+- Correct empty-value hints for nested mappings and block sequences, including indentless sequences. Truly null values still receive a hint.
+- Align the standalone frontend version label with the integration package.
+
 ## 4.1.13 (2026-08-28)
 
 - Isolation: persistence is now card-local, removing `window._haToolsPersistence` load-order coupling while retaining existing localStorage keys.

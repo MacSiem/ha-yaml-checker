@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v5.0.0 — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v5.0.0 (2026-10-01) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -1285,7 +1285,15 @@ class HAYamlChecker extends HTMLElement {
       }
       // Empty value (key with no value)
       const emptyVal = line.match(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*):\s*$/);
-      if (emptyVal && !line.trim().startsWith('#')) {
+      const nextValueLine = emptyVal
+        ? lines.slice(i + 1).find(candidate => candidate.trim() && !candidate.trim().startsWith('#'))
+        : null;
+      // A block mapping/list supplies the value; YAML also allows an indentless sequence.
+      const hasBlockValue = nextValueLine != null && (
+        nextValueLine.match(/^ */)[0].length > emptyVal[1].length ||
+        (nextValueLine.match(/^ */)[0].length === emptyVal[1].length && /^ *-(?:\s|$)/.test(nextValueLine))
+      );
+      if (emptyVal && !hasBlockValue) {
         warnings.push({ line: i + 1, msg: this._lang === 'pl' ? `Pusta warto\u015B\u0107 dla klucza "${emptyVal[2]}" \u2014 sprawdz czy zamierzone` : this._t.emptyValue.replace('{key}', emptyVal[2]), severity: 'info' });
       }
       // Count indent styles

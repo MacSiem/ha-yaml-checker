@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v4.1.13 (2026-08-28) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v5.0.0 (2026-10-01) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -9,7 +9,7 @@ const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = 
 const _esc = ((s) => String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 /**
- * HA YAML Checker v3.0
+ * HA YAML Checker v5.0.0
  * Advanced YAML validator for Home Assistant configuration files.
  * Part of HA Tools Panel - Debug category
  * Author: Jeff (AI) for MacSiem
@@ -1285,7 +1285,15 @@ class HAYamlChecker extends HTMLElement {
       }
       // Empty value (key with no value)
       const emptyVal = line.match(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*):\s*$/);
-      if (emptyVal && !line.trim().startsWith('#')) {
+      const nextValueLine = emptyVal
+        ? lines.slice(i + 1).find(candidate => candidate.trim() && !candidate.trim().startsWith('#'))
+        : null;
+      // A block mapping/list supplies the value; YAML also allows an indentless sequence.
+      const hasBlockValue = nextValueLine != null && (
+        nextValueLine.match(/^ */)[0].length > emptyVal[1].length ||
+        (nextValueLine.match(/^ */)[0].length === emptyVal[1].length && /^ *-(?:\s|$)/.test(nextValueLine))
+      );
+      if (emptyVal && !hasBlockValue) {
         warnings.push({ line: i + 1, msg: this._lang === 'pl' ? `Pusta warto\u015B\u0107 dla klucza "${emptyVal[2]}" \u2014 sprawdz czy zamierzone` : this._t.emptyValue.replace('{key}', emptyVal[2]), severity: 'info' });
       }
       // Count indent styles
@@ -1615,7 +1623,7 @@ ${this._css()}
         <div class="card-header">
           <span class="card-title-icon">🔍</span>
           <h2>YAML Checker</h2>
-          <span class="version-badge">v3.0</span>
+          <span class="version-badge">v5.0.0</span>
         
         </div>
         <div class="tabs" id="tabs" role="tablist">
