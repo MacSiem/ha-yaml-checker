@@ -118,3 +118,17 @@ test('nested YAML values and indentless sequences are not empty-key warnings', (
   }
   dom.window.close();
 });
+
+
+test('configured title is rendered as escaped text and defaults to YAML Checker', () => {
+  const { instance, dom } = card();
+  const title = 'HA Tools QA '+('long label '.repeat(12))+'<img src=x onerror=alert(1)>';
+  instance.setConfig({ title });
+  instance.shadowRoot.innerHTML = instance._html();
+  assert.equal(instance.shadowRoot.querySelector('h2').textContent, title);
+  assert.equal(instance.shadowRoot.querySelector('h2 img'), null);
+  instance.setConfig({});
+  instance.shadowRoot.innerHTML = instance._html();
+  assert.equal(instance.shadowRoot.querySelector('h2').textContent, 'YAML Checker');
+  dom.window.close();
+});
