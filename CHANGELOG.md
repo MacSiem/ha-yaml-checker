@@ -1,3 +1,7 @@
+## Unreleased
+
+- Localize Paste/Template/guide diagnostics per card language; retain drafts and syntax examples, and distinguish supported actions/Jinja methods from unknown functions.
+
 ## 5.0.0 — integration candidate (2026-10-01)
 
 - Exclude event names, Jinja variable methods and notification icons from missing-entity results. Preserve literal template dependencies, `states.sensor.entity` references, event entity targets and scene entity-map keys.
