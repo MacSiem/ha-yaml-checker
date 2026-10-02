@@ -1,5 +1,8 @@
 ## 5.0.0 — integration candidate (2026-10-01)
 
+- Entity validation no longer treats service/action names or automation descriptions as missing entities; targets, templates and direct custom script calls remain checked.
+- File scan headings reflect available top-level syntax results while preserving the unknown fallback without a backend.
+
 - Keep the selected tab exposed to screen readers synchronized with the displayed content during navigation.
 
 - Disable native configuration validation for household or unknown roles with a localized administrator explanation; recheck the role before sending a request, including after a session change.

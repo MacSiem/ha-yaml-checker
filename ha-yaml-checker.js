@@ -952,6 +952,36 @@ class HAYamlChecker extends HTMLElement {
   }
 
   // ── Entity Validator ─────────────────────────────────────────────────────
+  // Extract possible entity references from configuration values, not service names.
+  _entityReferences(config) {
+    const domains = new Set(['light','switch','sensor','binary_sensor','input_boolean','input_number',
+      'input_select','input_datetime','input_text','automation','script','scene','person',
+      'device_tracker','media_player','climate','cover','fan','vacuum','camera','lock',
+      'alarm_control_panel','weather','sun','zone','group','counter','timer','number',
+      'select','button','text','event']);
+    const scriptServices = new Set(['turn_on', 'turn_off', 'toggle', 'reload']);
+    const refs = new Set();
+    const visit = (value, key = '') => {
+      if (typeof value === 'string') {
+        if (['alias', 'description', 'id'].includes(key)) return;
+        if (key === 'service' || key === 'action') {
+          // Calling script.example directly does refer to a script entity.
+          if (/^script\.[a-z0-9_]+$/.test(value) && !scriptServices.has(value.slice(7))) refs.add(value);
+          return;
+        }
+        for (const ref of value.match(/[a-z_]+\.[a-z0-9_]+/g) || []) {
+          if (domains.has(ref.split('.')[0])) refs.add(ref);
+        }
+      } else if (Array.isArray(value)) {
+        value.forEach(item => visit(item, key));
+      } else if (value && typeof value === 'object') {
+        Object.entries(value).forEach(([childKey, child]) => visit(child, childKey));
+      }
+    };
+    visit(config);
+    return refs;
+  }
+
   async _runEntityValidation() {
     if (this._entityLoading) return;
     this._entityLoading = true;
@@ -1003,19 +1033,7 @@ class HAYamlChecker extends HTMLElement {
           seenIds[autoId] = true;
         }
 
-        // Extract entity refs from automation
-        const text = JSON.stringify(auto);
-        const entityMatches = text.match(/[a-z_]+\.[a-z0-9_]+/g) || [];
-        const DOMAINS = ['light','switch','sensor','binary_sensor','input_boolean','input_number',
-          'input_select','input_datetime','input_text','automation','script','scene','person',
-          'device_tracker','media_player','climate','cover','fan','vacuum','camera','lock',
-          'alarm_control_panel','weather','sun','zone','group','counter','timer','number',
-          'select','button','text','event'];
-
-        for (const ref of new Set(entityMatches)) {
-          const domain = ref.split('.')[0];
-          if (!DOMAINS.includes(domain)) continue;
-          if (ref.includes('{{') || ref.includes('}}')) continue;
+        for (const ref of this._entityReferences(auto)) {
           if (!allEntityIds.has(ref)) {
             broken.push({
               entity: ref,
@@ -1024,24 +1042,6 @@ class HAYamlChecker extends HTMLElement {
             });
           } else {
             checked.push(ref);
-          }
-        }
-      }
-
-      // Check input_boolean, input_number, etc. references in scripts
-      for (const scr of scripts) {
-        const text = JSON.stringify(scr);
-        const entityMatches = text.match(/[a-z_]+\.[a-z0-9_]+/g) || [];
-        const DOMAINS = ['light','switch','sensor','binary_sensor','input_boolean','input_number','input_select'];
-        for (const ref of new Set(entityMatches)) {
-          const domain = ref.split('.')[0];
-          if (!DOMAINS.includes(domain)) continue;
-          if (!allEntityIds.has(ref)) {
-            broken.push({
-              entity: ref,
-              in: scr.alias || scr.id || 'script',
-              type: 'script',
-            });
           }
         }
       }
@@ -1070,51 +1070,19 @@ class HAYamlChecker extends HTMLElement {
         .filter(a => !a.description)
         .map(a => ({ id: a.id || a.entity_id || '?', alias: a.alias || '(brak alias)' }));
 
-      // Enhanced: Check for scripts referenced in automations
+      // Reuse the same references for detail groups so services do not reappear.
       const scriptRefs = [];
-      automations.forEach((auto) => {
-        const autoStr = JSON.stringify(auto);
-        const scripts_used = new Set();
-        const scriptMatches = autoStr.match(/"service"\s*:\s*"script\.([a-z0-9_]+)"/gi) || [];
-        scriptMatches.forEach(call => {
-          const scriptId = call.match(/script\.([a-z0-9_]+)/i)[1];
-          const scriptEntity = `script.${scriptId}`;
-          if (!allEntityIds.has(scriptEntity) && !scripts_used.has(scriptId)) {
-            scriptRefs.push({ auto: auto.alias || auto.id || '?', script: scriptEntity });
-            scripts_used.add(scriptId);
-          }
-        });
-      });
-
-      // Enhanced: Check for scene references
       const sceneRefs = [];
-      automations.forEach((auto) => {
-        const autoStr = JSON.stringify(auto);
-        const sceneMatches = autoStr.match(/"scene"\s*:\s*"([^"]+)"/gi) || [];
-        sceneMatches.forEach(call => {
-          const sceneId = call.match(/"([^"]+)"/)[1];
-          if (sceneId.startsWith('scene.') && !allEntityIds.has(sceneId)) {
-            sceneRefs.push({ auto: auto.alias || auto.id || '?', scene: sceneId });
-          }
-        });
-      });
-
-      // Enhanced: Check for input helper references
       const inputRefs = [];
-      const inputTypes = ['input_boolean', 'input_number', 'input_select', 'input_text', 'input_datetime'];
-      automations.forEach((auto) => {
-        const autoStr = JSON.stringify(auto);
-        inputTypes.forEach(inputType => {
-          const regex = new RegExp(`"${inputType}\\.([a-z0-9_]+)"`, 'gi');
-          let match;
-          while ((match = regex.exec(autoStr)) !== null) {
-            const fullId = `${inputType}.${match[1]}`;
-            if (!allEntityIds.has(fullId)) {
-              inputRefs.push({ auto: auto.alias || auto.id || '?', helper: fullId });
-            }
-          }
-        });
-      });
+      for (const auto of automations) {
+        const label = auto.alias || auto.id || '?';
+        for (const ref of this._entityReferences(auto)) {
+          if (allEntityIds.has(ref)) continue;
+          if (ref.startsWith('script.')) scriptRefs.push({ auto: label, script: ref });
+          if (ref.startsWith('scene.')) sceneRefs.push({ auto: label, scene: ref });
+          if (/^input_(boolean|number|select|text|datetime)\./.test(ref)) inputRefs.push({ auto: label, helper: ref });
+        }
+      }
 
       this._entityResult = {
         totalEntities: allEntityIds.size,
@@ -1206,6 +1174,7 @@ class HAYamlChecker extends HTMLElement {
         components: configInfo.components ? configInfo.components.length : '?',
         unit: configInfo.unit_system ? configInfo.unit_system.length_unit || 'km' : '?',
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
+        fileSyntaxAvailable: scannedFiles !== null,
         files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: scannedFiles?.get(f.path)?.status || 'unknown',
           reason: scannedFiles?.get(f.path)?.reason, line: scannedFiles?.get(f.path)?.line,
           column: scannedFiles?.get(f.path)?.column })),
@@ -1831,7 +1800,7 @@ ${this._css()}
         ${r.configDir ? `<div class="note-box">📁 ${this._t.configDirLabel}: <code>${this._esc(r.configDir)}</code></div>` : ''}
         ${r.logWarnings > 0 ? `<div class="note-box">⚠️ ${this._t.logWarnings}: ${this._esc(r.logWarnings)}</div>` : ''}
       ` : ''}
-      <div class="file-list-header" style="margin-top:12px;">${this._t.configFilesNote}</div>
+      <div class="file-list-header" style="margin-top:12px;">${r.fileSyntaxAvailable ? (this._lang === 'pl' ? 'Pliki konfiguracji — składnia YAML najwyższego poziomu' : 'Config files — top-level YAML syntax') : this._t.configFilesNote}</div>
       <div class="file-list">
         ${r.files.map(f => `
           <div class="file-item">
