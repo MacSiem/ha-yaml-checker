@@ -316,6 +316,66 @@ test('templated action and legacy service retain literal entity dependencies wit
 });
 
 
+test('event types are not entities while event entity targets and template dependencies remain references', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: { 'automation.test': { state: 'on', attributes: {} } },
+    callWS: async () => ({ config: {
+      triggers: [
+        { trigger: 'event', event_type: 'timer.finished', event_data: { entity_id: 'timer.missing' } },
+        { trigger: 'event', event_type: "{{ states('input_select.event_missing') }}" },
+        { trigger: 'state', entity_id: 'event.missing' },
+      ],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'event.missing', 'input_select.event_missing', 'timer.missing',
+  ]);
+  dom.window.close();
+});
+
+test('template variable methods are not entities while literal and states-object dependencies remain references', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: { 'automation.test': { state: 'on', attributes: {} } },
+    callWS: async () => ({ config: {
+      actions: [{ variables: {
+        response: "{% set text = states('input_text.missing') %}{{ text.split('.') | first }}",
+        chained: "{{ states.sensor.missing.state }} / {{ states['sensor.bracket_missing'].state }}",
+        target: "{{ 'light.literal_missing' if has_value('sensor.condition_missing') else 'light.fallback_missing' }}",
+      } }],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'input_text.missing', 'light.fallback_missing', 'light.literal_missing',
+    'sensor.bracket_missing', 'sensor.condition_missing', 'sensor.missing',
+  ]);
+  dom.window.close();
+});
+
+test('notification icon metadata is not an entity and templated icon dependencies are retained', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: { 'automation.test': { state: 'on', attributes: {} } },
+    callWS: async () => ({ config: {
+      actions: [{ action: 'notify.mobile_app_test', data: { data: { actions: [
+        { action: 'OPEN', icon: 'mdi:lock.open', title: 'Open' },
+        { action: 'OTHER', icon: "{{ 'mdi:lock.open' if is_state('binary_sensor.icon_missing', 'on') else 'mdi:lock' }}" },
+      ] } } }, { action: 'lock.open', target: { entity_id: 'lock.missing' } }],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'binary_sensor.icon_missing', 'lock.missing',
+  ]);
+  dom.window.close();
+});
+
 test('Polish scan views and English entity statistics use their selected language', async () => {
   const { instance, dom } = card();
   instance._lang = 'pl';
