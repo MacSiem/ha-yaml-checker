@@ -907,7 +907,7 @@ class HAYamlChecker extends HTMLElement {
 
   // ── HA Config Check ──────────────────────────────────────────────────────
   async _runConfigCheck() {
-    if (this._checkLoading) return;
+    if (this._hass?.user?.is_admin !== true || this._checkLoading) return;
     this._checkLoading = true;
     this._checkResult = null;
     this._updateTab('config-check');
@@ -1667,6 +1667,8 @@ ${this._css()}
 
   _renderConfigCheck() {
     const r = this._checkResult;
+    const admin = this._hass?.user?.is_admin === true;
+    const adminHint = this._lang === 'pl' ? 'Sprawdzenie konfiguracji HA wymaga konta administratora.' : 'Checking the Home Assistant configuration requires an administrator account.';
     return `
       <div class="tab-pane active" data-tab="config-check">
         <div class="info-box">
@@ -1674,10 +1676,11 @@ ${this._css()}
           <div>${this._t.checkConfigInfo}</div>
         </div>
         ${this._checkLoading ? '<div class="loading-wrap"><div class="spinner"></div> ' + this._t.checkingConfig + '</div>' : ''}
-        ${!this._checkLoading && !r ? '<div class="empty-hint">' + this._t.clickToCheck + '</div>' : ''}
+        ${!admin ? '<div class="info-box" role="status">' + adminHint + '</div>' : ''}
+        ${admin && !this._checkLoading && !r ? '<div class="empty-hint">' + this._t.clickToCheck + '</div>' : ''}
         ${!this._checkLoading && r ? this._renderCheckResult(r) : ''}
         <div style="margin-top:16px;">
-          <button class="btn btn-primary" id="btn-check" aria-label="${this._t.checkConfigBtn || 'Check configuration'}">✅ ${this._t.checkConfigBtn}</button>
+          <button class="btn btn-primary" id="btn-check" ${!admin || this._checkLoading ? 'disabled' : ''} aria-label="${this._t.checkConfigBtn || 'Check configuration'}">✅ ${this._t.checkConfigBtn}</button>
         </div>
       </div>
     `;

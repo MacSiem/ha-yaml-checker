@@ -1,5 +1,7 @@
 ## 5.0.0 — integration candidate (2026-10-01)
 
+- Disable native configuration validation for household or unknown roles with a localized administrator explanation; recheck the role before sending a request, including after a session change.
+
 - Correct empty-value hints for nested mappings and block sequences, including indentless sequences. Truly null values still receive a hint.
 - Align the standalone frontend version label with the integration package.
 - Respect the configured card title, escape it as text, and wrap long titles within narrow Sections cards.
