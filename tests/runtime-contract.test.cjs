@@ -51,6 +51,40 @@ test('unreadable automation configs cannot be reported as clean references', asy
   dom.window.close();
 });
 
+test('entity references exclude service names but retain targets, templates and custom script calls', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: {
+      'automation.test': { state: 'on', attributes: {} },
+      'light.existing': { state: 'off', attributes: {} },
+    },
+    callWS: async () => ({ config: {
+      alias: 'light.description_only',
+      action: [
+        { service: 'light.turn_on', target: { entity_id: ['light.existing', 'light.missing'] } },
+        { action: 'input_boolean.turn_off', target: { entity_id: 'input_boolean.missing' } },
+        { action: 'script.turn_on', target: { entity_id: 'script.missing_target' } },
+        { action: 'script.missing_direct' },
+        { service: 'script.missing_legacy' },
+        { action: 'scene.turn_on', target: { entity_id: 'scene.missing' } },
+        { condition: 'template', value_template: "{{ is_state('sensor.missing', 'on') }}" },
+      ],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'input_boolean.missing', 'light.missing', 'scene.missing', 'script.missing_direct',
+    'script.missing_legacy', 'script.missing_target', 'sensor.missing',
+  ].sort());
+  assert.deepEqual(Array.from(instance._entityResult.inputRefs, row => row.helper), ['input_boolean.missing']);
+  assert.deepEqual(Array.from(instance._entityResult.scriptRefs, row => row.script).sort(), [
+    'script.missing_direct', 'script.missing_legacy', 'script.missing_target',
+  ]);
+  assert.deepEqual(Array.from(instance._entityResult.sceneRefs, row => row.scene), ['scene.missing']);
+  dom.window.close();
+});
+
 test('syntax response is separate from heuristic lint and uses the integration endpoint', async () => {
   const { instance, dom } = card();
   const calls = [];
