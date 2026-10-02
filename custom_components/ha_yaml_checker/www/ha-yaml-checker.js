@@ -1961,6 +1961,7 @@ ${this._css()}
     // Update tab buttons
     this.shadowRoot.querySelectorAll('.tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === tab);
+      b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     });
     content.innerHTML = this._renderTabContent();
     this._attachEventListeners();

@@ -1,5 +1,7 @@
 ## 5.0.0 — integration candidate (2026-10-01)
 
+- Keep the selected tab exposed to screen readers synchronized with the displayed content during navigation.
+
 - Disable native configuration validation for household or unknown roles with a localized administrator explanation; recheck the role before sending a request, including after a session change.
 
 - Correct empty-value hints for nested mappings and block sequences, including indentless sequences. Truly null values still receive a hint.
