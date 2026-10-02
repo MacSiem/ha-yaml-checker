@@ -192,7 +192,7 @@ test('file heading describes available syntax results and keeps unknown fallback
     instance._hass.config.components = [];
     await instance._runFileScan();
     instance.shadowRoot.innerHTML = instance._renderFileScan();
-    assert.match(instance.shadowRoot.querySelector('.file-list-header').textContent, /status unknown/);
+    assert.match(instance.shadowRoot.querySelector('.file-list-header').textContent, language === 'pl' ? /status nieznany/ : /status unknown/);
     dom.window.close();
   }
 });
