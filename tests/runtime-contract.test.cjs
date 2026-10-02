@@ -136,6 +136,33 @@ test('server file statuses are kept separate from HA config validity', async () 
   dom.window.close();
 });
 
+test('file heading describes available syntax results and keeps unknown fallback', async () => {
+  for (const language of ['en', 'pl']) {
+    const { instance, dom } = card();
+    instance._lang = language;
+    instance._hass = {
+      user: { is_admin: true }, config: { components: ['ha_yaml_checker'] },
+      callWS: async message => message.type === 'ha_yaml_checker/scan_files'
+        ? { schema: 'ha-yaml-file-scan-v1', scope: 'top_level_syntax_only', files: [
+          { file: 'configuration.yaml', status: 'pass' },
+          { file: 'secrets.yaml', status: 'skipped', reason: 'secret_file' },
+        ] } : [],
+      callApi: async (_method, route) => route === 'config' ? { version: '2026.9.4' } : '',
+    };
+    await instance._runFileScan();
+    instance.shadowRoot.innerHTML = instance._renderFileScan();
+    const heading = instance.shadowRoot.querySelector('.file-list-header').textContent;
+    assert.match(heading, language === 'pl' ? /składnia YAML najwyższego poziomu/ : /top-level YAML syntax/);
+    assert.doesNotMatch(heading, /status unknown/);
+    assert.match(instance.shadowRoot.textContent, /!include/);
+    instance._hass.config.components = [];
+    await instance._runFileScan();
+    instance.shadowRoot.innerHTML = instance._renderFileScan();
+    assert.match(instance.shadowRoot.querySelector('.file-list-header').textContent, /status unknown/);
+    dom.window.close();
+  }
+});
+
 
 test('nested YAML values and indentless sequences are not empty-key warnings', () => {
   const { instance, dom } = card();
