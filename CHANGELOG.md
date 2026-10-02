@@ -1,5 +1,7 @@
 ## 5.0.0 — integration candidate (2026-10-01)
 
+- Keep scene.apply/create entity-map keys and literal entity dependencies in templated actions/services in reference checks without reporting ordinary service names as missing entities.
+
 - Entity validation no longer treats service/action names or automation descriptions as missing entities; targets, templates and direct custom script calls remain checked.
 - File scan headings reflect available top-level syntax results while preserving the unknown fallback without a backend.
 

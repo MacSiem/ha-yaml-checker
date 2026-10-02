@@ -967,6 +967,14 @@ class HAYamlChecker extends HTMLElement {
         if (key === 'service' || key === 'action') {
           // Calling script.example directly does refer to a script entity.
           if (/^script\.[a-z0-9_]+$/.test(value) && !scriptServices.has(value.slice(7))) refs.add(value);
+          if (/{{|{%/.test(value)) {
+            for (const match of value.matchAll(/\b(?:states|is_state|is_state_attr|state_attr|has_value)\s*\(\s*(['"])([a-z_]+\.[a-z0-9_]+)\1/g)) {
+              if (domains.has(match[2].split('.')[0])) refs.add(match[2]);
+            }
+            for (const match of value.matchAll(/(['"])(script\.[a-z0-9_]+)\1/g)) {
+              if (!scriptServices.has(match[2].slice(7))) refs.add(match[2]);
+            }
+          }
           return;
         }
         for (const ref of value.match(/[a-z_]+\.[a-z0-9_]+/g) || []) {
@@ -975,7 +983,11 @@ class HAYamlChecker extends HTMLElement {
       } else if (Array.isArray(value)) {
         value.forEach(item => visit(item, key));
       } else if (value && typeof value === 'object') {
-        Object.entries(value).forEach(([childKey, child]) => visit(child, childKey));
+        Object.entries(value).forEach(([childKey, child]) => {
+          if (key === 'entities' && /^[a-z_]+\.[a-z0-9_]+$/.test(childKey)
+            && domains.has(childKey.split('.')[0])) refs.add(childKey);
+          visit(child, childKey);
+        });
       }
     };
     visit(config);
