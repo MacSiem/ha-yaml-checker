@@ -280,3 +280,37 @@ test('tab navigation updates the selected state exposed to assistive technology'
   }
   dom.window.close();
 });
+
+// Append to existing tests/runtime-contract.test.cjs; reuses its card() helper.
+test('templated action and legacy service retain literal entity dependencies without service-name false positives', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: {
+      'automation.test': { state: 'on', attributes: {} },
+      'switch.ac': { state: 'off', attributes: {} },
+    },
+    callWS: async () => ({ config: {
+      alias: 'template service dependency fixture',
+      actions: [
+        { action: "{% if states('sensor.missing') | float(15) > 15 %} switch.turn_on {% else %} switch.turn_off {% endif %}", target: { entity_id: 'switch.ac' } },
+        { service: "{% if is_state('input_boolean.missing', 'on') %} light.turn_on {% else %} light.turn_off {% endif %}" },
+        { action: "{{ 'script.missing' }}" },
+        { service: "{{ 'script.legacy_missing' }}" },
+        { action: "{{ 'light.turn_on' }}" },
+        { action: "{{ 'script.turn_on' }}", target: { entity_id: 'script.target_missing' } },
+      ],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'input_boolean.missing', 'script.legacy_missing', 'script.missing',
+    'script.target_missing', 'sensor.missing',
+  ]);
+  assert.equal(instance._entityResult.checkedCount, 1);
+  assert.deepEqual(Array.from(instance._entityResult.scriptRefs, row => row.script).sort(), [
+    'script.legacy_missing', 'script.missing', 'script.target_missing',
+  ]);
+  assert.deepEqual(Array.from(instance._entityResult.inputRefs, row => row.helper), ['input_boolean.missing']);
+  dom.window.close();
+});
