@@ -725,9 +725,9 @@ class HAYamlChecker extends HTMLElement {
         logErrors: 'B\u0142\u0119d\u00F3w w logu',
         logWarnings: 'Ostrze\u017Ce\u0144 w logu',
         entities: 'Encji',
-        devices: 'Devices',
-        configDirLabel: 'Config directory',
-        configFilesNote: 'Config files (status unknown \u2014 HA API does not expose file contents)',
+        devices: "Urządzeń",
+        configDirLabel: "Katalog konfiguracji",
+        configFilesNote: "Pliki konfiguracji (status nieznany — zawartość plików nie została sprawdzona)",
         trailingWhitespace: 'Trailing whitespace',
         emptyValue: 'Empty value for key "{key}" \u2014 verify if intentional',
         inconsistentIndent: 'Inconsistent indentation: mixed 2-space ({count2}x) and 4-space ({count4}x). Recommended: 2 spaces.',
@@ -751,44 +751,49 @@ class HAYamlChecker extends HTMLElement {
         unknownDeviceClass: 'Unknown device_class: "{value}"',
         availabilityTemplate: 'Best practice: add availability_template with value_template',
         jinja2SyntaxError: 'Check {% set %} syntax',
-        pasteYamlLabel: 'Paste YAML to check',
-        clearBtn: 'Clear',
-        validateBtn: 'Validate YAML',
-        checkConfigBtn: 'Check HA Configuration',
-        checkConfigInfo: "Runs HA's built-in validator (homeassistant.check_config). Detects YAML syntax errors and invalid configuration keys.",
-        clickToCheck: 'Click the button to check configuration',
-        checkingConfig: 'Checking HA configuration...',
-        pasteHint: 'Paste YAML file content here...',
-        clientValidation: 'client-side validation',
-        scanEntitiesBtn: 'Scan Entities',
+        pasteYamlLabel: "Wklej YAML do sprawdzenia",
+        clearBtn: "Wyczyść",
+        validateBtn: "Sprawdź YAML",
+        checkConfigBtn: "Sprawdź konfigurację HA",
+        checkConfigInfo: "Uruchamia natywny walidator HA (homeassistant.check_config). Wykrywa błędy składni YAML i nieprawidłowe klucze konfiguracji.",
+        clickToCheck: "Kliknij przycisk, aby sprawdzić konfigurację",
+        checkingConfig: "Sprawdzanie konfiguracji HA…",
+        pasteHint: "Wklej tutaj zawartość pliku YAML…",
+        clientValidation: "sprawdzenie heurystyczne w przeglądarce",
+        scanEntitiesBtn: "Skanuj encje",
         scanEntityInfo: 'Scans entity names, templates, and YAML syntax for common encoding issues',
         scanEntityHint: 'Scanning for potential issues...',
         checkTemplateBtn: 'Check Template',
         templateLabel: 'Template:',
-        scanSystemBtn: 'Scan System',
-        entityCheckInfo: 'Scans readable automations for possible references to non-existent entities. Script configurations are not checked.',
-        analyzingEntities: 'Analyzing entities...',
-        clickToScanEntities: 'Click the button to scan entities',
-        templateTesterInfo: 'Test Jinja2 templates directly via HA API. Same as Dev Tools › Template, but built into the card.',
-        jinja2Template: 'Jinja2 Template',
-        executingTemplate: 'Executing template...',
-        result: 'Result',
-        executeTemplate: 'Execute Template',
+        scanSystemBtn: "Skanuj system",
+        entityCheckInfo: "Skanuje dostępne automatyzacje w poszukiwaniu referencji do nieistniejących encji. Konfiguracje skryptów nie są sprawdzane.",
+        analyzingEntities: "Analizowanie encji…",
+        clickToScanEntities: "Kliknij przycisk, aby przeskanować encje",
+        templateTesterInfo: "Sprawdza szablony Jinja2 przez API HA, tak jak Narzędzia deweloperskie › Szablon.",
+        jinja2Template: "Szablon Jinja2",
+        executingTemplate: "Wykonywanie szablonu…",
+        result: "Wynik",
+        executeTemplate: "Wykonaj szablon",
         locale: (this._lang === 'pl' ? 'pl-PL' : 'en-US'),
-        guideTabLabel: '📖 Guide',
-        automationsDesc: 'Automations',
-        brokenRefsTitle: 'Broken References',
-        noRefs: 'No broken references!',
-        unavailableTitle: 'Unavailable/Unknown Entities',
-        noDescTitle: 'Automations without Description',
-        scanSystemInfo: 'HA system information: version, entity, device, area, and component counts.',
-        clickToScanSystem: 'Click the button to scan system',
-        partialError: 'Partial Error',
-        critical: 'critical',
+        guideTabLabel: "📖 Poradnik",
+        automationsDesc: "Automatyzacje",
+        brokenRefsTitle: "Uszkodzone referencje",
+        noRefs: "Brak uszkodzonych referencji",
+        unavailableTitle: "Encje niedostępne lub o nieznanym stanie",
+        noDescTitle: "Automatyzacje bez opisu",
+        scanSystemInfo: "Informacje o HA: wersja oraz liczba encji, urządzeń, obszarów i komponentów.",
+        clickToScanSystem: "Kliknij przycisk, aby przeskanować system",
+        partialError: "Niepełny wynik",
+        critical: "ważny",
         fileHint: 'To check file contents use: Paste & Validate or HA File Editor addon.',
-        moreCount: '...and {count} more',
-        entitiesWithoutFriendlyName: 'Entities without friendly_name',
-        topDomains: 'Top domains',
+        moreCount: "…i jeszcze {count}",
+        entitiesWithoutFriendlyName: "Encje bez friendly_name",
+        entitiesInHA: 'Encji w HA',
+        automationsCount: 'Automatyzacji',
+        scriptsCount: 'Skryptów',
+        brokenRefsCount: 'Uszkodz. ref.',
+        haVersion: 'Wersja HA',
+        topDomains: "Najliczniejsze domeny",
       },
       en: {
         title: 'YAML Checker',
@@ -877,6 +882,11 @@ class HAYamlChecker extends HTMLElement {
         fileHint: 'To check file contents use: Paste & Validate or HA File Editor addon.',
         moreCount: '...and {count} more',
         entitiesWithoutFriendlyName: 'Entities without friendly_name',
+        entitiesInHA: 'Entities in HA',
+        automationsCount: 'Automations',
+        scriptsCount: 'Scripts',
+        brokenRefsCount: 'Broken refs',
+        haVersion: 'HA version',
         topDomains: 'Top domains',
       },
     };
@@ -1563,6 +1573,15 @@ class HAYamlChecker extends HTMLElement {
 :host(.bento-dark) .intro-banner .intro-dismiss:hover { background: #27272f; color: #fafaf9; }
 
 ${this._css()}
+/* Respond to the card width, including narrow desktop Sections columns. */
+.card { container-type: inline-size; }
+.stats-grid.system-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stat-card { min-width: 0; }
+.stat-label, .stat-value { overflow-wrap: anywhere; }
+@container (max-width: 420px) {
+  .stats-grid, .stats-grid.system-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 
 :host(.bento-dark) {
     --bento-bg: var(--primary-background-color, #1a1a2e);
@@ -1610,26 +1629,26 @@ ${this._css()}
         <div class="tabs" id="tabs" role="tablist">
           ${['config-check','entity-validator','file-scanner','paste-validate','template-tester','common-issues'].map(t => `
             <button class="tab-btn${t===this._activeTab?' active':''}" data-tab="${t}" role="tab" aria-selected="${t===this._activeTab}" aria-label="${{
-                'config-check': 'Config Check',
-                'entity-validator': 'Entity Validator',
-                'file-scanner': 'File Scanner',
-                'paste-validate': 'Paste Validate',
-                'template-tester': 'Template Tester',
-                'common-issues': 'Common Issues Guide',
+                'config-check': this._lang === 'pl' ? 'Sprawdzanie konfiguracji' : 'Config Check',
+                'entity-validator': this._lang === 'pl' ? 'Walidator encji' : 'Entity Validator',
+                'file-scanner': this._lang === 'pl' ? 'Skaner plików' : 'File Scanner',
+                'paste-validate': this._lang === 'pl' ? 'Sprawdź wklejony YAML' : 'Paste Validate',
+                'template-tester': this._lang === 'pl' ? 'Tester szablonów' : 'Template Tester',
+                'common-issues': this._lang === 'pl' ? 'Poradnik' : 'Common Issues Guide',
               }[t]}">
               ${{
-                'config-check': '✅ Config',
-                'entity-validator': '🔗 Entities',
-                'file-scanner': '📁 Files',
-                'paste-validate': '📝 Paste',
-                'template-tester': '🧪 Template',
+                'config-check': this._lang === 'pl' ? '✅ Konfiguracja' : '✅ Config',
+                'entity-validator': this._lang === 'pl' ? '🔗 Encje' : '🔗 Entities',
+                'file-scanner': this._lang === 'pl' ? '📁 Pliki' : '📁 Files',
+                'paste-validate': this._lang === 'pl' ? '📝 Wklej' : '📝 Paste',
+                'template-tester': this._lang === 'pl' ? '🧪 Szablon' : '🧪 Template',
                 'common-issues': this._t.guideTabLabel,
               }[t]}
             </button>
           `).join('')}
         </div>
         <div id="tab-content">${this._renderTabContent()}</div>
-        ${this._hass?.user?.is_admin && this._config?.show_support !== false && !this._supportDismissed() ? `<div class="donate-section" data-source="own-card" style="margin:8px 0 0;padding:4px 0;background:none;border:0;box-shadow:none;min-height:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-direction:row;justify-content:flex-start;text-align:left"><a href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--secondary-text-color,#64748b);font-weight:400;text-decoration:underline">Optional support for HA Tools</a><button type="button" class="support-dismiss" aria-label="Dismiss support link" style="margin-left:auto;padding:2px 6px;min-height:0;line-height:1;border:0;background:none;color:var(--secondary-text-color,#64748b);cursor:pointer">×</button></div>` : ''}
+        ${this._hass?.user?.is_admin && this._config?.show_support !== false && !this._supportDismissed() ? `<div class="donate-section" data-source="own-card" style="margin:8px 0 0;padding:4px 0;background:none;border:0;box-shadow:none;min-height:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-direction:row;justify-content:flex-start;text-align:left"><a href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--secondary-text-color,#64748b);font-weight:400;text-decoration:underline">${this._lang === 'pl' ? 'Opcjonalne wsparcie HA Tools' : 'Optional support for HA Tools'}</a><button type="button" class="support-dismiss" aria-label="${this._lang === 'pl' ? 'Ukryj odnośnik wsparcia' : 'Dismiss support link'}" style="margin-left:auto;padding:2px 6px;min-height:0;line-height:1;border:0;background:none;color:var(--secondary-text-color,#64748b);cursor:pointer">×</button></div>` : ''}
       </div>
     `;
   }
@@ -1716,19 +1735,19 @@ ${this._css()}
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-value">${r.totalEntities}</div>
-          <div class="stat-label">Encji w HA</div>
+          <div class="stat-label">${this._t.entitiesInHA}</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${r.totalAutomations}</div>
-          <div class="stat-label">Automatyzacji</div>
+          <div class="stat-label">${this._t.automationsCount}</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${r.totalScripts}</div>
-          <div class="stat-label">Skrypt\u00F3w</div>
+          <div class="stat-label">${this._t.scriptsCount}</div>
         </div>
         <div class="stat-card ${r.broken.length ? 'stat-error' : ''}">
           <div class="stat-value ${r.broken.length ? 'error-val' : ''}">${r.broken.length}</div>
-          <div class="stat-label">Uszkodz. ref.</div>
+          <div class="stat-label">${this._t.brokenRefsCount}</div>
         </div>
       </div>
       ${r.dupIds.length ? `
@@ -1742,7 +1761,7 @@ ${this._css()}
       ${r.broken.length ? `
         <div class="issue-section">
           <h3>❌ ${this._t.brokenRefsTitle} (${r.broken.length})</h3>
-          ${r.broken.map(b => `<div class="issue-item error"><span class="issue-icon">❌</span><div><strong>${this._esc(b.entity)}</strong> <span style="color:var(--text-secondary);font-size:11px;">w ${this._esc(b.type)}: ${this._esc(b.in)}</span></div></div>`).join('')}
+          ${r.broken.map(b => `<div class="issue-item error"><span class="issue-icon">❌</span><div><strong>${this._esc(b.entity)}</strong> <span style="color:var(--text-secondary);font-size:11px;">${this._lang === 'pl' ? 'w' : 'in'} ${this._esc(b.type)}: ${this._esc(b.in)}</span></div></div>`).join('')}
         </div>
       ` : r.unreadableAutomations ? '' : '<div class="all-good">✅ ' + this._t.noRefs + ' (automation config)</div>'}
       ${r.problemStates?.length ? `
@@ -1794,12 +1813,31 @@ ${this._css()}
     `;
   }
 
+  _fileDescription(file) {
+    const descriptions = this._lang === 'pl' ? {
+      'configuration.yaml': 'Główna konfiguracja HA',
+      'automations.yaml': 'Automatyzacje', 'scripts.yaml': 'Skrypty',
+      'scenes.yaml': 'Sceny', 'groups.yaml': 'Grupy',
+      'customize.yaml': 'Dostosowanie encji',
+      'secrets.yaml': 'Sekrety (wrażliwe dane)',
+      'ui-lovelace.yaml': 'Lovelace (tryb YAML)',
+    } : {
+      'configuration.yaml': 'Main HA configuration',
+      'automations.yaml': 'Automations', 'scripts.yaml': 'Scripts',
+      'scenes.yaml': 'Scenes', 'groups.yaml': 'Groups',
+      'customize.yaml': 'Entity customization',
+      'secrets.yaml': 'Secrets (sensitive data)',
+      'ui-lovelace.yaml': 'Lovelace (YAML mode)',
+    };
+    return descriptions[file.path] || file.desc || '';
+  }
+
   _renderScanResult(r) {
     return `
       ${r.error ? `<div class="error-box">⚠️ ${this._t.partialError}: ${this._esc(r.error)}</div>` : ''}
       ${r.haVersion ? `
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-          <div class="stat-card"><div class="stat-value">${this._esc(r.haVersion)}</div><div class="stat-label">HA Version</div></div>
+        <div class="stats-grid system-stats">
+          <div class="stat-card"><div class="stat-value">${this._esc(r.haVersion)}</div><div class="stat-label">${this._t.haVersion}</div></div>
           <div class="stat-card"><div class="stat-value">${this._esc(r.entityCount)}</div><div class="stat-label">${this._t.entities}</div></div>
           <div class="stat-card"><div class="stat-value">${this._esc(r.deviceCount)}</div><div class="stat-label">${this._t.devices}</div></div>
           <div class="stat-card"><div class="stat-value">${this._esc(r.areaCount)}</div><div class="stat-label">${this._t.areas}</div></div>
@@ -1819,7 +1857,7 @@ ${this._css()}
             <span class="file-icon">📔</span>
             <div class="file-info">
               <div class="file-path">${this._esc(f.path)}${f.critical ? '<span class="badge critical">' + this._t.critical + '</span>' : ''}</div>
-              <div class="file-desc">${this._esc(f.desc)}</div>
+              <div class="file-desc">${this._esc(this._fileDescription(f))}</div>
             </div>
             <span class="file-status-icon" title="${this._esc(f.reason || (f.status === 'pass' ? 'Top-level YAML syntax only; includes not followed' : f.status))}">${f.status === 'pass' ? '✅' : f.status === 'fail' ? '❌' : f.status === 'skipped' ? '➖' : '❓'} ${this._esc(f.status)}${f.status === 'fail' && Number.isInteger(f.line) ? ` ${f.line}${Number.isInteger(f.column) ? `:${f.column}` : ''}` : ''}</span>
           </div>
