@@ -987,6 +987,24 @@ class HAYamlChecker extends HTMLElement {
           }
           return;
         }
+        if (/{{|{%/.test(value)) {
+          // Jinja variables may have methods such as text.split; only static
+          // entity literals and HA's states object reveal entity dependencies.
+          for (const match of value.matchAll(/\b(?:states|is_state|is_state_attr|state_attr|has_value)\s*\(\s*(['"])([a-z_]+\.[a-z0-9_]+)\1/g)) {
+            if (domains.has(match[2].split('.')[0])) refs.add(match[2]);
+          }
+          for (const match of value.matchAll(/\bstates\.([a-z_]+\.[a-z0-9_]+)\b/g)) {
+            if (domains.has(match[1].split('.')[0])) refs.add(match[1]);
+          }
+          if (!['event_type', 'icon'].includes(key)) {
+            for (const match of value.matchAll(/(['"])([a-z_]+\.[a-z0-9_]+)\1/g)) {
+              if (domains.has(match[2].split('.')[0])) refs.add(match[2]);
+            }
+          }
+          return;
+        }
+        // Event names and notification icons can contain domain-like words.
+        if (['event_type', 'icon'].includes(key)) return;
         for (const ref of value.match(/[a-z_]+\.[a-z0-9_]+/g) || []) {
           if (domains.has(ref.split('.')[0])) refs.add(ref);
         }
