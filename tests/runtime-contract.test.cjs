@@ -168,3 +168,20 @@ test('an administrator retains native validation and its actual result', async (
   assert.equal(requests, 1);
   dom.window.close();
 });
+
+
+test('tab navigation updates the selected state exposed to assistive technology', () => {
+  const { instance, dom } = card();
+  instance.setConfig({});
+  instance.shadowRoot.innerHTML = instance._html();
+  // Use the production navigation handler rather than the test stub.
+  const navigate = Object.getPrototypeOf(instance)._updateTab.bind(instance);
+  for (const tab of ['file-scanner', 'paste-validate', 'template-tester', 'config-check']) {
+    navigate(tab);
+    const selected = instance.shadowRoot.querySelectorAll('[role="tab"][aria-selected="true"]');
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].dataset.tab, tab);
+    assert.ok(instance.shadowRoot.querySelector(`.tab-pane[data-tab="${tab}"]`));
+  }
+  dom.window.close();
+});
