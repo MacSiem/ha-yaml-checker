@@ -19,6 +19,7 @@ test('failed native config check never becomes PASS through a service acknowledg
   const { instance, dom } = card();
   let serviceCalls = 0;
   instance._hass = {
+    user: { is_admin: true },
     callApi: async () => { throw new Error('unavailable'); },
     callService: async () => { serviceCalls++; },
   };
@@ -130,5 +131,40 @@ test('configured title is rendered as escaped text and defaults to YAML Checker'
   instance.setConfig({});
   instance.shadowRoot.innerHTML = instance._html();
   assert.equal(instance.shadowRoot.querySelector('h2').textContent, 'YAML Checker');
+  dom.window.close();
+});
+
+
+test('household and unknown roles cannot run native configuration validation', async () => {
+  for (const user of [{ is_admin: false }, undefined]) {
+    for (const language of ['en', 'pl']) {
+      const { instance, dom } = card();
+      let requests = 0;
+      instance._lang = language;
+      instance._hass = { user, callApi: async () => { requests++; return { result: 'valid' }; } };
+      instance.shadowRoot.innerHTML = instance._renderConfigCheck();
+      assert.equal(instance.shadowRoot.querySelector('#btn-check').disabled, true);
+      assert.match(instance.shadowRoot.textContent, language === 'pl' ? /administrator/i : /administrator/i);
+      await instance._runConfigCheck();
+      assert.equal(requests, 0, 'a direct or stale handler must also refuse the request');
+      assert.equal(instance._checkLoading, false);
+      dom.window.close();
+    }
+  }
+});
+
+test('an administrator retains native validation and its actual result', async () => {
+  const { instance, dom } = card();
+  let requests = 0;
+  instance._hass = { user: { is_admin: true }, callApi: async () => { requests++; return { result: 'valid' }; } };
+  instance.shadowRoot.innerHTML = instance._renderConfigCheck();
+  assert.equal(instance.shadowRoot.querySelector('#btn-check').disabled, false);
+  await instance._runConfigCheck();
+  assert.equal(requests, 1);
+  assert.equal(instance._checkResult.ok, true);
+  // Authority may change after the button was rendered.
+  instance._hass.user.is_admin = false;
+  await instance._runConfigCheck();
+  assert.equal(requests, 1);
   dom.window.close();
 });
