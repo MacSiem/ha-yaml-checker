@@ -85,6 +85,40 @@ test('entity references exclude service names but retain targets, templates and 
   dom.window.close();
 });
 
+test('scene entity-map keys remain references without treating scene service names as entities', async () => {
+  const { instance, dom } = card();
+  instance._hass = {
+    user: { is_admin: true },
+    states: {
+      'automation.test': { state: 'on', attributes: {} },
+      'light.existing': { state: 'off', attributes: {} },
+    },
+    callWS: async () => ({ config: {
+      alias: 'scene.description_only',
+      action: [
+        { action: 'scene.apply', data: { entities: {
+          'light.existing': { state: 'on' },
+          'light.missing': { state: 'off' },
+          'media_player.missing': 'off',
+        } } },
+        { service: 'scene.create', data: {
+          scene_id: 'temporary',
+          entities: { 'input_boolean.missing': 'on' },
+          snapshot_entities: ['sensor.missing'],
+        } },
+      ],
+    } }),
+  };
+  await instance._runEntityValidation();
+  assert.deepEqual(Array.from(instance._entityResult.broken, row => row.entity).sort(), [
+    'input_boolean.missing', 'light.missing', 'media_player.missing', 'sensor.missing',
+  ]);
+  assert.deepEqual(Array.from(instance._entityResult.sceneRefs), []);
+  assert.deepEqual(Array.from(instance._entityResult.inputRefs, row => row.helper), ['input_boolean.missing']);
+  assert.equal(instance._entityResult.checkedCount, 1);
+  dom.window.close();
+});
+
 test('syntax response is separate from heuristic lint and uses the integration endpoint', async () => {
   const { instance, dom } = card();
   const calls = [];
