@@ -314,3 +314,23 @@ test('templated action and legacy service retain literal entity dependencies wit
   assert.deepEqual(Array.from(instance._entityResult.inputRefs, row => row.helper), ['input_boolean.missing']);
   dom.window.close();
 });
+
+
+test('Polish scan views and English entity statistics use their selected language', async () => {
+  const { instance, dom } = card();
+  instance._lang = 'pl';
+  instance._hass = { language: 'pl', user: { is_admin: true }, states: {},
+    callWS: async () => [], callApi: async () => ({}) };
+  instance.shadowRoot.innerHTML = instance._html();
+  const plTabs = Array.from(instance.shadowRoot.querySelectorAll('[role="tab"]'), b => b.getAttribute('aria-label'));
+  assert.deepEqual(plTabs, ['Sprawdzanie konfiguracji', 'Walidator encji', 'Skaner plików', 'Sprawdź wklejony YAML', 'Tester szablonów', 'Poradnik']);
+  assert.match(instance.shadowRoot.textContent, /Opcjonalne wsparcie HA Tools/);
+  assert.match(instance._renderEntityValidator(), /Skanuje dostępne automatyzacje/);
+  instance._lang = 'en';
+  await instance._runEntityValidation();
+  const wrap = dom.window.document.createElement('div');
+  wrap.innerHTML = instance._renderEntityResult(instance._entityResult);
+  assert.deepEqual(Array.from(wrap.querySelectorAll('.stat-label'), e => e.textContent), ['Entities in HA', 'Automations', 'Scripts', 'Broken refs']);
+  assert.doesNotMatch(wrap.textContent, /Encji w HA|Automatyzacji|Skryptów/);
+  dom.window.close();
+});
