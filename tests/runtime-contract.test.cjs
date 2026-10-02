@@ -4,6 +4,101 @@ const path = require('node:path');
 const test = require('node:test');
 const { JSDOM } = require('jsdom');
 
+test('Polish paste diagnostics use Polish text for indentation, duplicate keys and includes', () => {
+  const { instance, dom } = card();
+  try {
+    instance._lang = 'pl';
+    const result = instance._validateYAML('homeassistant:\n  name: QA\n    latitude: 0\nhomeassistant: !include qa.yaml\n');
+    const text = result.warnings.map(row => row.msg).join('\n');
+    assert.match(text, /Niespójne wcięcia/);
+    assert.match(text, /Powtórzony klucz/);
+    assert.match(text, /Sprawdź ścieżkę/);
+    assert.doesNotMatch(text, /Inconsistent indentation|Duplicate root-level key|referenced file/);
+  } finally { dom.window.close(); }
+});
+
+test('English paste diagnostics localize tab and Jinja control-flow errors with line numbers retained', () => {
+  const { instance, dom } = card();
+  try {
+    instance._lang = 'en';
+    const result = instance._validateYAML('\tname: QA\n{% endif %}\n{% endfor %}\n{% if true %}\n{% for x in [1] %}\n');
+    assert.deepEqual(Array.from(result.errors, row => row.line), [1, 2, 3, 4, 5]);
+    const text = result.errors.map(row => row.msg).join('\n');
+    assert.match(text, /Tabs cannot be used/);
+    assert.match(text, /without an opening/);
+    assert.match(text, /Unclosed/);
+    assert.doesNotMatch(text, /zamiast|bez otwierającego|Niezamknięty/);
+  } finally { dom.window.close(); }
+});
+
+test('changing language localizes paste counts and template examples without changing drafts or template code', () => {
+  const { instance, dom } = card();
+  try {
+    instance._pasteValue = 'name: QA';
+    instance._pasteErrors = { errors: [], warnings: [{ line: 1, msg: 'QA', severity: 'info' }], lineCount: 1 };
+    instance._templateValue = '{{ states("sun.sun") }}';
+    for (const [lang, count, time, attribute] of [['pl', 'Liczba linii: 1', 'czas', 'atrybut'], ['en', 'Lines: 1', 'time', 'attribute']]) {
+      instance._lang = lang;
+      assert.match(instance._renderPasteValidate(), new RegExp(count));
+      const div = dom.window.document.createElement('div');
+      div.innerHTML = instance._renderTemplateTester();
+      const examples = Array.from(div.querySelectorAll('.template-example'));
+      assert.match(examples[1].textContent, new RegExp(time));
+      assert.match(examples[2].textContent, new RegExp(attribute));
+      assert.equal(examples[1].dataset.tpl, '{{ now().strftime("%H:%M") }}');
+      assert.equal(examples[2].dataset.tpl, '{{ state_attr("sun.sun","elevation") | round(1) }}');
+    }
+    assert.equal(instance._pasteValue, 'name: QA');
+    assert.equal(instance._templateValue, '{{ states("sun.sun") }}');
+  } finally { dom.window.close(); }
+});
+
+test('guide language belongs to each card and follows a later language change', () => {
+  const a = card(), b = card();
+  try {
+    a.instance._lang = 'pl'; b.instance._lang = 'en';
+    const pl = a.instance._renderCommonIssues();
+    const en = b.instance._renderCommonIssues();
+    assert.match(pl, /Wcięcia/);
+    assert.match(pl, /Mieszanie spacji i tabulatorów/);
+    assert.match(pl, /Encje i szablony/);
+    assert.doesNotMatch(pl, /Mixing spaces and tabs|Text Strings|Missing alias field/);
+    assert.match(en, /Indentation/);
+    assert.match(en, /Entities &amp; templates|Entities & templates/);
+    assert.doesNotMatch(en, /Stara skladnia|Uzyj true|Usuniety|Encje i szablony/);
+    a.instance._lang = 'en';
+    assert.equal(a.instance._renderCommonIssues(), en);
+    b.instance._lang = 'pl';
+    assert.equal(b.instance._renderCommonIssues(), pl);
+  } finally { a.dom.window.close(); b.dom.window.close(); }
+});
+
+test('supported persistent notification actions are not presented as renamed services', () => {
+  const { instance, dom } = card();
+  try {
+    for (const lang of ['pl', 'en']) {
+      instance._lang = lang;
+      for (const key of ['service', 'action']) {
+        const result = instance._validateYAML(`${key}: persistent_notification.create\ndata:\n  message: QA\n${key}: persistent_notification.dismiss\n`);
+        assert.equal(result.warnings.some(row => /renamed|zmieniono|notify\.persistent_notification/.test(row.msg)), false);
+      }
+    }
+  } finally { dom.window.close(); }
+});
+
+test('Jinja object methods are not unknown global functions while unknown global calls remain advice', () => {
+  const { instance, dom } = card();
+  try {
+    for (const lang of ['pl', 'en']) {
+      instance._lang = lang;
+      const result = instance._validateYAML('response: \'{{ text.split(",") }}\'\ntime: \'{{ now().strftime("%H:%M") }}\'\nbad: \'{{ qa_unknown() }}\'\n');
+      const unknown = result.warnings.filter(row => /Unknown template function|Nieznana funkcja szablonu/.test(row.msg));
+      assert.deepEqual(Array.from(unknown, row => row.line), [3]);
+      assert.match(unknown[0].msg, /qa_unknown/);
+    }
+  } finally { dom.window.close(); }
+});
+
 function card() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
     runScripts: 'dangerously', url: 'http://localhost/'
