@@ -1,0 +1,4 @@
+{
+  "config": {"step": {"user": {"title": "YAML Checker", "description": "Dodaj panel i kartę YAML Checker do analizy tylko do odczytu."}}},
+  "options": {"step": {"init": {"title": "Opcje YAML Checker", "data": {"show_panel": "Pokaż panel boczny"}}}}
+}

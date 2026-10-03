@@ -1,3 +1,27 @@
+## Unreleased
+
+- Refresh open tabs and retained validation messages after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection. Keep the last checked YAML separate from a newer draft and avoid repeating backend requests.
+- Localize Paste/Template/guide diagnostics per card language; retain drafts and syntax examples, and distinguish supported actions/Jinja methods from unknown functions.
+
+## 5.0.0 — integration candidate (2026-10-01)
+
+- Exclude event names, Jinja variable methods and notification icons from missing-entity results. Preserve literal template dependencies, `states.sensor.entity` references, event entity targets and scene entity-map keys.
+
+- Localize scan navigation, statistics, file descriptions and support controls in Polish and English, and wrap statistics into two columns when the card itself is narrow.
+
+- Keep scene.apply/create entity-map keys and literal entity dependencies in templated actions/services in reference checks without reporting ordinary service names as missing entities.
+
+- Entity validation no longer treats service/action names or automation descriptions as missing entities; targets, templates and direct custom script calls remain checked.
+- File scan headings reflect available top-level syntax results while preserving the unknown fallback without a backend.
+
+- Keep the selected tab exposed to screen readers synchronized with the displayed content during navigation.
+
+- Disable native configuration validation for household or unknown roles with a localized administrator explanation; recheck the role before sending a request, including after a session change.
+
+- Correct empty-value hints for nested mappings and block sequences, including indentless sequences. Truly null values still receive a hint.
+- Align the standalone frontend version label with the integration package.
+- Respect the configured card title, escape it as text, and wrap long titles within narrow Sections cards.
+
 ## 4.1.13 (2026-08-28)
 
 - Isolation: persistence is now card-local, removing `window._haToolsPersistence` load-order coupling while retaining existing localStorage keys.
@@ -53,3 +77,8 @@ All notable changes to **YAML Checker** are documented here.
 ### Compatibility
 
 - Home Assistant ≥ 2024.1.0
+## Unreleased — integration development branch
+
+- Add an optional integration with an administrator panel, bounded in-memory YAML parsing and top-level file syntax checks. The server returns only status and error location, skips symlinks and `secrets.yaml`, and does not follow includes.
+- Use real Home Assistant WebSocket registry and per-automation configuration commands; report incomplete reads and unsupported script checks instead of green results. Remove incorrect deprecation warnings for valid `automation:` and `script:` configuration keys.
+- Keep native HA configuration validation, server syntax, and client heuristic advice as separate outcomes; escape pasted text and template results in the UI.

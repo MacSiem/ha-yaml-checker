@@ -102,14 +102,33 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
       else if (t.tag === 'ha-yaml-checker') {
         const footers = el.shadowRoot.querySelectorAll('.donate-section[data-source="own-card"]');
         const coffee = el.shadowRoot.querySelector('a[href="https://buymeacoffee.com/macsiem"]');
-        const paypal = el.shadowRoot.querySelector('a[href="https://www.paypal.com/donate/?hosted_button_id=Y967H4PLRBN8W"]');
         if (footers.length !== 1) problem = `expected one card-owned footer, got ${footers.length}`;
         else if (!coffee || coffee.target !== '_blank' || coffee.rel !== 'noopener noreferrer') problem = 'invalid Buy Me a Coffee link';
-        else if (!paypal || paypal.target !== '_blank' || paypal.rel !== 'noopener noreferrer') problem = 'invalid PayPal link';
+        else if (footers[0].querySelectorAll('a').length !== 1) problem = 'support footer has more than one link';
         else if (el.shadowRoot.innerHTML.includes('foreign-bento')) problem = 'render captured a foreign global Bento stylesheet';
         else if (!el.shadowRoot.innerHTML.includes('HA Tools — Bento Design System v2.0')) problem = 'component-local Bento stylesheet missing';
         else if (window.HAToolsBentoCSS !== ':host{display:none!important}/* foreign-bento */') problem = 'card mutated the pre-seeded global Bento stylesheet';
         else if (window.document.head.querySelector('script')) problem = 'card injected a document-level script';
+      }
+      if (!problem && t.tag === 'ha-yaml-checker') {
+        const dismiss = el.shadowRoot.querySelector('.support-dismiss');
+        if (!dismiss) problem = 'admin support dismiss button missing';
+        else {
+          dismiss.click();
+          if (el.shadowRoot.querySelector('.donate-section')) problem = 'dismissed support remained visible';
+          else if (window.localStorage.getItem('ha-yaml-checker-support-dismissed') !== '1') problem = 'support dismissal was not persisted';
+        }
+        window.localStorage.removeItem('ha-yaml-checker-support-dismissed');
+        for (const mode of ['optout', 'guest']) {
+          if (problem) break;
+          const card = window.document.createElement(t.tag);
+          card.setConfig({ type: 'custom:' + t.tag, show_support: mode === 'optout' ? false : true });
+          const scopedHass = mockHass(); scopedHass.user.is_admin = mode !== 'guest';
+          card.hass = scopedHass; window.document.body.appendChild(card); card.hass = scopedHass;
+          await delay(100);
+          if (card.shadowRoot.querySelector('.donate-section')) problem = mode + ' saw the support link';
+          card.remove();
+        }
       }
       window.close();
     } catch (e) { problem = (e && e.message) ? e.message : String(e); }
