@@ -665,6 +665,7 @@ class HAYamlChecker extends HTMLElement {
   }
 
   set hass(hass) {
+    const previousLanguage = this._lang;
     try {
       var _bg = (getComputedStyle(this).getPropertyValue('--card-background-color') || getComputedStyle(this).getPropertyValue('--primary-background-color') || '').trim();
       var _d = false;
@@ -677,11 +678,26 @@ class HAYamlChecker extends HTMLElement {
       this.classList.toggle('bento-dark', _d);
     } catch (e) {}
 
-    if (hass?.language) this._lang = hass.language.startsWith('pl') ? 'pl' : 'en';    this._hass = hass;
+    if (hass?.language) this._lang = hass.language.startsWith('pl') ? 'pl' : 'en';
+    this._hass = hass;
     if (!hass) return;
     if (!this._firstRender) {
       this._firstRender = true;
       this._render();
+    } else if (previousLanguage !== this._lang) {
+      const active = this.shadowRoot.activeElement;
+      const editor = active?.id === 'yaml-input' || active?.id === 'template-input';
+      const selection = editor ? {
+        id: active.id, start: active.selectionStart, end: active.selectionEnd,
+        direction: active.selectionDirection, scrollTop: active.scrollTop,
+      } : null;
+      this._render();
+      if (selection) {
+        const current = this.shadowRoot.getElementById(selection.id);
+        current?.focus({ preventScroll: true });
+        current?.setSelectionRange(selection.start, selection.end, selection.direction);
+        if (current) current.scrollTop = selection.scrollTop;
+      }
     }
   }
 
