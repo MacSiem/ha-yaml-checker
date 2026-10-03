@@ -76,3 +76,48 @@ test('ordinary state updates in the same locale leave an open editor untouched',
     assert.equal(input.selectionStart, 3); assert.equal(input.selectionEnd, 8);
   } finally { dom.window.close(); }
 });
+
+test('retained own paste diagnostics follow the locale without repeating backend validation', async () => {
+  const { card, dom, hass } = fixture('en');
+  let requests = 0;
+  const current = { ...hass, config: { components: ['ha_yaml_checker'] },
+    callWS: async () => { requests++; return { schema: 'ha-yaml-syntax-v1', status: 'invalid', line: 2, column: 4 }; } };
+  try {
+    card.hass = current; tab(card, 'paste-validate');
+    const input = card.shadowRoot.getElementById('yaml-input');
+    input.value = '{% endif %}'; input.dispatchEvent(new dom.window.Event('input'));
+    card.shadowRoot.getElementById('btn-validate').click();
+    await Promise.resolve(); await Promise.resolve();
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
+    const nativeResult = card._pasteSyntax;
+    const edited = card.shadowRoot.getElementById('yaml-input');
+    edited.value = 'name: unvalidated new draft'; edited.dispatchEvent(new dom.window.Event('input'));
+    card.hass = { ...current, language: 'pl' };
+    const text = card.shadowRoot.getElementById('tab-content').textContent;
+    assert.match(text, /bez otwierającego/);
+    assert.doesNotMatch(text, /without an opening/);
+    assert.equal(card.shadowRoot.getElementById('yaml-input').value, 'name: unvalidated new draft');
+    assert.equal(card._pasteSyntax, nativeResult); assert.equal(requests, 1);
+    card.hass = current;
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
+    assert.equal(requests, 1);
+  } finally { dom.window.close(); }
+});
+
+test('retained own unavailable-config note follows ordinary locale changes without a new API request', async () => {
+  const { card, dom, hass } = fixture('en');
+  let requests = 0;
+  const current = { ...hass, callApi: async () => { requests++; throw Error('Synthetic unavailable'); } };
+  try {
+    card.hass = current; card.shadowRoot.getElementById('btn-check').click();
+    await Promise.resolve(); await Promise.resolve();
+    assert.match(card.shadowRoot.textContent, /could not run; result unknown/);
+    card.hass = { ...current, language: 'pl' };
+    assert.match(card.shadowRoot.textContent, /Nie udało się uruchomić natywnej walidacji HA/);
+    assert.doesNotMatch(card.shadowRoot.textContent, /could not run; result unknown/);
+    assert.equal(card._checkResult.ok, null); assert.equal(requests, 1);
+    card.hass = current;
+    assert.match(card.shadowRoot.textContent, /could not run; result unknown/);
+    assert.equal(requests, 1);
+  } finally { dom.window.close(); }
+});
