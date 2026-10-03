@@ -109,15 +109,17 @@ test('retained own unavailable-config note follows ordinary locale changes witho
   let requests = 0;
   const current = { ...hass, callApi: async () => { requests++; throw Error('Synthetic unavailable'); } };
   try {
-    card.hass = current; card.shadowRoot.getElementById('btn-check').click();
-    await Promise.resolve(); await Promise.resolve();
-    assert.match(card.shadowRoot.textContent, /could not run; result unknown/);
+    card.hass = current; tab(card, 'config-check');
+    card.shadowRoot.getElementById('btn-check').click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(requests, 1); assert.equal(card._checkResult.apiError, true);
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /could not run; result unknown/);
     card.hass = { ...current, language: 'pl' };
-    assert.match(card.shadowRoot.textContent, /Nie udało się uruchomić natywnej walidacji HA/);
-    assert.doesNotMatch(card.shadowRoot.textContent, /could not run; result unknown/);
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /Nie udało się uruchomić natywnej walidacji HA/);
+    assert.doesNotMatch(card.shadowRoot.getElementById('tab-content').textContent, /could not run; result unknown/);
     assert.equal(card._checkResult.ok, null); assert.equal(requests, 1);
     card.hass = current;
-    assert.match(card.shadowRoot.textContent, /could not run; result unknown/);
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /could not run; result unknown/);
     assert.equal(requests, 1);
   } finally { dom.window.close(); }
 });
