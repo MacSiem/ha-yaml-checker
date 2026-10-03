@@ -87,7 +87,7 @@ test('retained own paste diagnostics follow the locale without repeating backend
     const input = card.shadowRoot.getElementById('yaml-input');
     input.value = '{% endif %}'; input.dispatchEvent(new dom.window.Event('input'));
     card.shadowRoot.getElementById('btn-validate').click();
-    await Promise.resolve(); await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
     assert.match(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
     const nativeResult = card._pasteSyntax;
     const edited = card.shadowRoot.getElementById('yaml-input');
