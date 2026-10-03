@@ -1,6 +1,6 @@
 ## Unreleased
 
-- Refresh open tabs after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection.
+- Refresh open tabs and retained validation messages after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection. Keep the last checked YAML separate from a newer draft and avoid repeating backend requests.
 - Localize Paste/Template/guide diagnostics per card language; retain drafts and syntax examples, and distinguish supported actions/Jinja methods from unknown functions.
 
 ## 5.0.0 — integration candidate (2026-10-01)

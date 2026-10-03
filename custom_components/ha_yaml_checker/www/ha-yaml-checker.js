@@ -534,6 +534,7 @@ class HAYamlChecker extends HTMLElement {
     this._pasteValue = '';
     this._pasteErrors = [];
     this._pasteSyntax = null;
+    this._pasteValidatedValue = null;
     this._pasteCheckSeq = 0;
     this._entityResult = null;
     this._entityLoading = false;
@@ -685,6 +686,10 @@ class HAYamlChecker extends HTMLElement {
       this._firstRender = true;
       this._render();
     } else if (previousLanguage !== this._lang) {
+      // Translate the last checked value, not a newer unvalidated draft.
+      if (this._pasteValidatedValue !== null) {
+        this._pasteErrors = this._validateYAML(this._pasteValidatedValue);
+      }
       const active = this.shadowRoot.activeElement;
       const editor = active?.id === 'yaml-input' || active?.id === 'template-input';
       const selection = editor ? {
@@ -1285,6 +1290,7 @@ class HAYamlChecker extends HTMLElement {
   async _runPasteValidation(value) {
     const sequence = ++this._pasteCheckSeq;
     this._pasteValue = value;
+    this._pasteValidatedValue = value;
     this._pasteErrors = this._validateYAML(value);
     this._pasteSyntax = { status: 'checking' };
     this._updateTab('paste-validate');
@@ -1740,12 +1746,15 @@ ${this._css()}
     const icon = r.ok === true ? '✅' : r.ok === false ? '❌' : '⚠️';
     const label = r.ok === true ? this._t.configOk : r.ok === false ? this._t.configError
       : (this._lang === 'pl' ? 'Wynik walidacji HA nieznany' : 'Home Assistant validation result unknown');
+    const note = r.apiError
+      ? (this._lang === 'pl' ? 'Nie udało się uruchomić natywnej walidacji HA; wynik nieznany.' : 'Home Assistant validation could not run; result unknown.')
+      : r.note;
     return `
       <div class="result-header ${cls}">
         <span class="result-icon">${icon}</span>
         <div>
           <strong>${label}</strong>
-          <small>${this._esc(r.ts)}${r.note ? ' · ' + this._esc(r.note) : ''}</small>
+          <small>${this._esc(r.ts)}${note ? ' · ' + this._esc(note) : ''}</small>
         </div>
       </div>
       ${r.errors.length ? `<div class="issue-section"><h3>${this._t.errors} (${r.errors.length})</h3>
@@ -2064,6 +2073,7 @@ ${this._css()}
     on('btn-clear-paste', 'click', () => {
       this._pasteCheckSeq++;
       this._pasteValue = '';
+      this._pasteValidatedValue = null;
       this._pasteErrors = null;
       this._pasteSyntax = null;
       this._updateTab('paste-validate');
