@@ -44,7 +44,7 @@ def scan_files(config_dir: Path) -> dict[str, Any]:
         path = config_dir / name
         result: dict[str, Any] = {"file": name, "status": "skipped"}
         try:
-            fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | os.O_NONBLOCK)
         except FileNotFoundError:
             result["reason"] = "missing"
             rows.append(result)

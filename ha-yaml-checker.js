@@ -981,6 +981,13 @@ class HAYamlChecker extends HTMLElement {
     return { current, hass: { ...source, callApi: guarded('callApi'), callWS: guarded('callWS') } };
   }
 
+  _errorMessage(error) {
+    for (const value of [error?.body?.message, error?.message, error?.error?.message, error]) {
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    return this._lang === 'pl' ? 'Żądanie HA nie powiodło się.' : 'Home Assistant request failed.';
+  }
+
   // ── HA Config Check ──────────────────────────────────────────────────────
   async _runConfigCheck() {
     const context = this._requestContext();
@@ -1217,7 +1224,7 @@ class HAYamlChecker extends HTMLElement {
       };
     } catch (e) {
       if (!context.current()) return;
-      this._entityResult = { error: e.message || String(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
+      this._entityResult = { error: this._errorMessage(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
     this._entityLoading = false;
@@ -1304,7 +1311,7 @@ class HAYamlChecker extends HTMLElement {
       this._scanResult = {
         files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: 'unknown' })),
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
-        error: e.message,
+        error: this._errorMessage(e),
       };
     }
 
@@ -1331,7 +1338,7 @@ class HAYamlChecker extends HTMLElement {
     } catch (e) {
       if (!context.current()) return;
       if (sequence !== this._templateCheckSeq) return;
-      this._templateResult = { ok: false, error: e.message || String(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
+      this._templateResult = { ok: false, error: this._errorMessage(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
     this._templateLoading = false;
@@ -1832,7 +1839,7 @@ ${this._css()}
         </div>
         ${this._entityLoading ? '<div class="loading-wrap"><div class="spinner"></div> ' + this._t.analyzingEntities + '</div>' : ''}
         ${!this._entityLoading && !r ? '<div class="empty-hint">' + this._t.clickToScanEntities + '</div>' : ''}
-        ${!this._entityLoading && r && r.error ? `<div class="error-box">❌ ${this._lang === 'pl' ? 'B\u0142\u0105d' : 'Error'}: ${r.error}</div>` : ''}
+        ${!this._entityLoading && r && r.error ? `<div class="error-box">❌ ${this._lang === 'pl' ? 'B\u0142\u0105d' : 'Error'}: ${this._esc(r.error)}</div>` : ''}
         ${!this._entityLoading && r && !r.error ? this._renderEntityResult(r) : ''}
         <div style="margin-top:16px;">
           <button class="btn btn-primary" id="btn-entity" aria-label="${this._t.scanEntitiesBtn || 'Scan Entities'}">🔗 ${this._t.scanEntitiesBtn || 'Scan Entities'}</button>
