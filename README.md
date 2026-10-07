@@ -5,7 +5,7 @@
 Inspect Home Assistant configuration from a Lovelace card — run HA's own
 config check, find possible broken references in readable automations,
 review system inventory, lint pasted YAML, and test Jinja2 templates.
-The optional integration adds an administrator panel, a real parser for
+The integration adds an optional administrator panel, a real parser for
 pasted text, and on-demand top-level file syntax checks.
 
 [![Version](https://img.shields.io/github/v/release/MacSiem/ha-yaml-checker)](https://github.com/MacSiem/ha-yaml-checker/releases) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -13,8 +13,8 @@ pasted text, and on-demand top-level file syntax checks.
 ## How it works
 
 **Short version: nothing runs until you click a button.** Every check is
-on-demand against your live HA instance — the card holds no config options
-of its own:
+on-demand against your live HA instance. Card options control the title and
+optional support link; they do not change your HA configuration:
 
 1. **Config Check.** Calls HA's built-in validator (`POST
    config/core/check_config`) and shows its result. If the call fails,
@@ -51,7 +51,7 @@ of its own:
 | Automatic | Manual (button click) |
 |---|---|
 | Tab shell renders on load; last-used tab is remembered (`localStorage` + URL hash) | Run "Check Configuration" (HA's built-in validator) |
-| UI language auto-detected from the browser (PL/EN) | Run "Scan Entities" (broken refs, duplicate IDs, unavailable entities) |
+| UI language follows Home Assistant (PL/EN) | Run "Scan Entities" (broken refs, duplicate IDs, unavailable entities) |
 | Light/dark theme follows your Home Assistant theme | Run "Scan System" (HA version, entity/device/area counts, log stats) |
 | | Paste and validate arbitrary YAML |
 | | Execute a Jinja2 template |
@@ -74,19 +74,30 @@ The currently published HACS package is a Dashboard card:
 2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**.
 3. Install **YAML Checker** and reload your browser.
 
-The integration package is prepared on the development branch. For manual
-development installation, copy `custom_components/ha_yaml_checker` to
-`<config>/custom_components/`, restart HA, then add **YAML Checker** under
-Settings → Devices & services. It registers the card and an optional
-administrator sidebar panel. HACS integration installation requires a
-published integration package and an accepted category change.
+Version 5.0.0 is the integration candidate on this branch. Once its release
+and HACS category change are published, new installations use **Integration**:
+download YAML Checker in HACS, restart HA once, then add **YAML Checker** under
+Settings → Devices & services. The card registers automatically. The optional
+administrator sidebar appears at `/yaml-checker`; integration options can hide it.
+HA 2025.2 or later is required.
 
-Keep your working Dashboard plugin, its resources, and existing card configuration
-while trying the integration. In storage mode the integration reuses the existing
-card resource. Check that your dashboards still work and the integration is loaded
-before retiring the plugin. The public plugin remains available until the
-integration release and migration have been verified. A category change alone
-is not a verified migration.
+For manual development installation, copy `custom_components/ha_yaml_checker`
+to `<config>/custom_components/`, restart HA, and add the integration as above.
+
+For a Dashboard-plugin migration, first update the standalone card to 5.0.0
+and reload the browser. Then change only this repository's HACS registration
+to Integration and install the integration package. Keep your existing card
+configuration and resource while checking the migration: storage-mode dashboards
+reuse a matching existing card resource, so it must contain the current card.
+Confirm that the integration is loaded, the card displays 5.0.0, and pasted YAML
+gets a separate HA parser result before retiring the old plugin registration.
+The public 4.1.13 plugin remains the baseline until the integration release and
+migration have been verified. A category change alone is not a verified migration.
+
+Without an existing card resource, storage mode creates one versioned module.
+YAML resource mode loads the bundled module automatically; existing YAML card
+definitions remain valid. After any frontend update, reload the browser to use
+the new module. Removing the integration removes only its owned panel/resource.
 
 ## Quick start
 
@@ -97,6 +108,10 @@ type: custom:ha-yaml-checker
 That's it — no options are required.
 
 ### Optional sidebar panel
+
+The integration's built-in sidebar requires no YAML. Toggle it in the integration
+options; it is available only to administrators. For the standalone Dashboard
+plugin, the following legacy manual panel remains supported:
 
 ```yaml
 panel_custom:

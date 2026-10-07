@@ -1,5 +1,6 @@
 ## 5.0.0 — integration candidate (2026-10-07)
 
+- Display readable HA API error messages, escape entity-check errors as text, and skip named pipes without waiting for a writer during file scans.
 - Stop parser/file commands while the integration is unloaded and recheck administrator access after pending scans. Remove only the integration-owned YAML-mode module on unload.
 - Discard stale responses after user/connection changes or disconnect, preserve the selected tab during background checks, and retain editor focus and selection.
 - Refresh open tabs and retained validation messages after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection. Clear validation results when the checked YAML draft changes and avoid repeating backend requests.
