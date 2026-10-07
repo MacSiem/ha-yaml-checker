@@ -48,6 +48,8 @@ async def _async_options_updated(hass: HomeAssistant, entry: YAMLCheckerConfigEn
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: YAMLCheckerConfigEntry) -> bool:
+    if entry.runtime_data.card_registration == "extra_js_url":
+        frontend.async_unregister_extra_js(hass)
     if entry.runtime_data.panel_registered:
         frontend.async_unregister_panel(hass)
         entry.runtime_data.panel_registered = False

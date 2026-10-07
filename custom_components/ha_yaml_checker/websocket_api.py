@@ -8,10 +8,22 @@ from pathlib import Path
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
 from .syntax import check_syntax, scan_files
+
+
+def _available(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> bool:
+    """Global commands must remain gated by the current loaded integration."""
+    if not connection.user.is_admin:
+        connection.send_error(msg["id"], "unauthorized", "Administrator access required")
+        return False
+    if not any(entry.state is ConfigEntryState.LOADED for entry in hass.config_entries.async_entries(DOMAIN)):
+        connection.send_error(msg["id"], "unavailable", "YAML Checker is not loaded")
+        return False
+    return True
 
 
 @callback
@@ -29,7 +41,8 @@ async def ws_check_syntax(
     msg: dict[str, Any],
 ) -> None:
     """Parse pasted YAML in memory; return no content or exception text."""
-    connection.send_result(msg["id"], check_syntax(msg["yaml"]))
+    if _available(hass, connection, msg):
+        connection.send_result(msg["id"], check_syntax(msg["yaml"]))
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/scan_files"})
@@ -41,5 +54,8 @@ async def ws_scan_files(
     msg: dict[str, Any],
 ) -> None:
     """Read only the allowlisted top-level files in an executor."""
+    if not _available(hass, connection, msg):
+        return
     result = await hass.async_add_executor_job(scan_files, Path(hass.config.config_dir))
-    connection.send_result(msg["id"], result)
+    if _available(hass, connection, msg):
+        connection.send_result(msg["id"], result)
