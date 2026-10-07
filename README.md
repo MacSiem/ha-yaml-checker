@@ -70,13 +70,17 @@ These are native Home Assistant screenshots of version 5.0.0 on a synthetic stag
 
 ## Installation
 
-The currently published HACS package is a Dashboard card:
+For the legacy Dashboard-card installation:
 
 1. Open HACS → Custom repositories.
 2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**.
 3. Install **YAML Checker** and reload your browser.
 
-Version 5.0.0 adds an **Integration** package. Check the [published releases](https://github.com/MacSiem/ha-yaml-checker/releases) for availability. If the HACS default catalog still lists the older Dashboard package while the category migration is under review, add this repository as a custom **Integration** after the 5.0.0 release is published:
+Version 5.0.0 adds an **Integration** package. Check the
+[published releases](https://github.com/MacSiem/ha-yaml-checker/releases) for
+availability. If the HACS default catalog still lists the older Dashboard
+package while the category migration is under review, add this repository as a
+custom **Integration** after the 5.0.0 release is published:
 download YAML Checker in HACS, restart HA once, then add **YAML Checker** under
 Settings → Devices & services. The card registers automatically. The optional
 administrator sidebar appears at `/yaml-checker`; integration options can hide it.
@@ -92,8 +96,9 @@ configuration and resource while checking the migration: storage-mode dashboards
 reuse a matching existing card resource, so it must contain the current card.
 Confirm that the integration is loaded, the card displays 5.0.0, and pasted YAML
 gets a separate HA parser result before retiring the old plugin registration.
-The public 4.1.13 plugin remains the baseline until the integration release and
-migration have been verified. A category change alone is not a verified migration.
+The 4.1.13 Dashboard package remains a rollback baseline. The default HACS
+catalog may retain its Dashboard category while the integration migration is
+under review. A category change alone is not a verified migration.
 
 Without an existing card resource, storage mode creates one versioned module.
 YAML resource mode loads the bundled module automatically; existing YAML card
