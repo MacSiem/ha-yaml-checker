@@ -60,11 +60,13 @@ optional support link; they do not change your HA configuration:
 
 | Light | Dark |
 |---|---|
-| ![Config Check, light theme](docs/screenshots/card-main-light.png) | ![Config Check, dark theme](docs/screenshots/card-main-dark.png) |
+| ![Config Check, light theme](docs/screenshots/card-main-light.jpg) | ![Config Check, dark theme](docs/screenshots/card-main-dark.jpg) |
 
 *Default view with a synthetic successful Config Check result and timestamp.
 The card identifies HA's built-in validator. Dark mode follows your Home
 Assistant theme.*
+
+These are native Home Assistant screenshots of version 5.0.0 on a synthetic staging configuration. The valid result comes from HA’s configuration check. No household data appears in the images.
 
 ## Installation
 
@@ -74,8 +76,7 @@ The currently published HACS package is a Dashboard card:
 2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**.
 3. Install **YAML Checker** and reload your browser.
 
-Version 5.0.0 is the integration candidate on this branch. Once its release
-and HACS category change are published, new installations use **Integration**:
+Version 5.0.0 adds an **Integration** package. Check the [published releases](https://github.com/MacSiem/ha-yaml-checker/releases) for availability. If the HACS default catalog still lists the older Dashboard package while the category migration is under review, add this repository as a custom **Integration** after the 5.0.0 release is published:
 download YAML Checker in HACS, restart HA once, then add **YAML Checker** under
 Settings → Devices & services. The card registers automatically. The optional
 administrator sidebar appears at `/yaml-checker`; integration options can hide it.
