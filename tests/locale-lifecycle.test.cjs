@@ -89,17 +89,17 @@ test('retained own paste diagnostics follow the locale without repeating backend
     card.shadowRoot.getElementById('btn-validate').click();
     await new Promise(resolve => setImmediate(resolve));
     assert.match(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
-    const nativeResult = card._pasteSyntax;
+    assert.equal(card._pasteSyntax.status, 'invalid');
     const edited = card.shadowRoot.getElementById('yaml-input');
     edited.value = 'name: unvalidated new draft'; edited.dispatchEvent(new dom.window.Event('input'));
     card.hass = { ...current, language: 'pl' };
     const text = card.shadowRoot.getElementById('tab-content').textContent;
-    assert.match(text, /bez otwierającego/);
+    assert.doesNotMatch(text, /bez otwierającego/);
     assert.doesNotMatch(text, /without an opening/);
     assert.equal(card.shadowRoot.getElementById('yaml-input').value, 'name: unvalidated new draft');
-    assert.equal(card._pasteSyntax, nativeResult); assert.equal(requests, 1);
+    assert.equal(card._pasteSyntax, null); assert.equal(requests, 1);
     card.hass = current;
-    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
+    assert.doesNotMatch(card.shadowRoot.getElementById('tab-content').textContent, /without an opening/);
     assert.equal(requests, 1);
   } finally { dom.window.close(); }
 });

@@ -525,6 +525,8 @@ class HAYamlChecker extends HTMLElement {
     this._lang = (navigator.language || '').startsWith('pl') ? 'pl' : 'en';
     this.attachShadow({ mode: 'open' });
     this._hass = null;
+    this._requestEpoch = 0;
+    this._templateCheckSeq = 0;
     this._config = {};
     this._activeTab = 'config-check';
     this._checkResult = null;
@@ -667,6 +669,12 @@ class HAYamlChecker extends HTMLElement {
 
   set hass(hass) {
     const previousLanguage = this._lang;
+    const principal = `${hass?.user?.id || ''}:${hass?.user?.is_admin === true}`;
+    const boundary = this._principal !== undefined
+      && (principal !== this._principal || hass?.connection !== this._connection);
+    if (boundary) this._invalidateRequests();
+    this._principal = principal;
+    this._connection = hass?.connection;
     try {
       var _bg = (getComputedStyle(this).getPropertyValue('--card-background-color') || getComputedStyle(this).getPropertyValue('--primary-background-color') || '').trim();
       var _d = false;
@@ -685,7 +693,7 @@ class HAYamlChecker extends HTMLElement {
     if (!this._firstRender) {
       this._firstRender = true;
       this._render();
-    } else if (previousLanguage !== this._lang) {
+    } else if (boundary || previousLanguage !== this._lang) {
       // Translate the last checked value, not a newer unvalidated draft.
       if (this._pasteValidatedValue !== null) {
         this._pasteErrors = this._validateYAML(this._pasteValidatedValue);
@@ -950,15 +958,40 @@ class HAYamlChecker extends HTMLElement {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  _invalidateRequests() {
+    this._requestEpoch++;
+    this._pasteCheckSeq++;
+    this._templateCheckSeq++;
+    this._checkResult = this._entityResult = this._scanResult = null;
+    this._pasteSyntax = this._pasteErrors = this._pasteValidatedValue = null;
+    this._templateResult = null;
+    this._checkLoading = this._entityLoading = this._scanLoading = this._templateLoading = false;
+  }
+
+  _requestContext() {
+    const epoch = this._requestEpoch;
+    const source = this._hass;
+    const current = () => epoch === this._requestEpoch;
+    const guarded = method => async (...args) => {
+      if (!current()) throw Error('Request cancelled');
+      const result = await source[method](...args);
+      if (!current()) throw Error('Request cancelled');
+      return result;
+    };
+    return { current, hass: { ...source, callApi: guarded('callApi'), callWS: guarded('callWS') } };
+  }
+
   // ── HA Config Check ──────────────────────────────────────────────────────
   async _runConfigCheck() {
-    if (this._hass?.user?.is_admin !== true || this._checkLoading) return;
+    const context = this._requestContext();
+    const hass = context.hass;
+    if (hass?.user?.is_admin !== true || this._checkLoading) return;
     this._checkLoading = true;
     this._checkResult = null;
-    this._updateTab('config-check');
+    this._refreshTab('config-check');
 
     try {
-      const result = await this._hass.callApi('POST', 'config/core/check_config');
+      const result = await hass.callApi('POST', 'config/core/check_config');
       // HA API returns errors/warnings as string or null, not array
       const rawErrors = result.errors;
       const rawWarnings = result.warnings;
@@ -983,6 +1016,7 @@ class HAYamlChecker extends HTMLElement {
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
       };
     } catch (e) {
+      if (!context.current()) return;
       this._checkResult = {
         ok: null,
         errors: [],
@@ -993,7 +1027,7 @@ class HAYamlChecker extends HTMLElement {
       };
     }
     this._checkLoading = false;
-    this._updateTab('config-check');
+    this._refreshTab('config-check');
   }
 
   // ── Entity Validator ─────────────────────────────────────────────────────
@@ -1058,14 +1092,16 @@ class HAYamlChecker extends HTMLElement {
   }
 
   async _runEntityValidation() {
+    const context = this._requestContext();
+    const hass = context.hass;
     if (this._entityLoading) return;
     this._entityLoading = true;
     this._entityResult = null;
-    this._updateTab('entity-validator');
+    this._refreshTab('entity-validator');
 
     try {
       // Fetch all states (all entity IDs)
-      const states = this._hass.states;
+      const states = hass.states;
       const allEntityIds = new Set(Object.keys(states));
 
       // The native command is per automation. A failed read must not turn into
@@ -1073,14 +1109,15 @@ class HAYamlChecker extends HTMLElement {
       const automationIds = Object.keys(states).filter(id => id.startsWith('automation.'));
       const automations = [];
       let unreadableAutomations = 0;
-      if (this._hass.user?.is_admin) {
+      if (hass.user?.is_admin) {
         for (let offset = 0; offset < automationIds.length; offset += 8) {
           const batch = await Promise.all(automationIds.slice(offset, offset + 8).map(async entityId => {
             try {
-              const response = await this._hass.callWS({ type: 'automation/config', entity_id: entityId });
+              const response = await hass.callWS({ type: 'automation/config', entity_id: entityId });
               return response?.config && typeof response.config === 'object' ? response.config : null;
             } catch (_) { return null; }
           }));
+          if (!context.current()) return;
           for (const config of batch) config ? automations.push(config) : unreadableAutomations++;
         }
       } else unreadableAutomations = automationIds.length;
@@ -1130,12 +1167,12 @@ class HAYamlChecker extends HTMLElement {
       const brokenUniq = Object.values(brokenMap);
 
       // FUNC-1: Check unavailable/unknown entities
-      const problemStates = Object.entries(this._hass.states)
+      const problemStates = Object.entries(hass.states)
         .filter(([id, s]) => ['unavailable', 'unknown'].includes(s.state))
         .map(([id, s]) => ({ entity: id, state: s.state, name: s.attributes?.friendly_name || id }));
 
       // FUNC-1: Check entities without friendly_name
-      const noFriendlyName = Object.entries(this._hass.states)
+      const noFriendlyName = Object.entries(hass.states)
         .filter(([id, s]) => !s.attributes?.friendly_name)
         .map(([id]) => id)
         .slice(0, 50);
@@ -1159,6 +1196,7 @@ class HAYamlChecker extends HTMLElement {
         }
       }
 
+      if (!context.current()) return;
       this._entityResult = {
         totalEntities: allEntityIds.size,
         totalAutomations: automationIds.length,
@@ -1178,24 +1216,28 @@ class HAYamlChecker extends HTMLElement {
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
       };
     } catch (e) {
+      if (!context.current()) return;
+      if (!context.current()) return;
       this._entityResult = { error: e.message || String(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
     this._entityLoading = false;
-    this._updateTab('entity-validator');
+    this._refreshTab('entity-validator');
   }
 
   // ── File Scanner ─────────────────────────────────────────────────────────
   async _runFileScan() {
+    const context = this._requestContext();
+    const hass = context.hass;
     if (this._scanLoading) return;
     this._scanLoading = true;
     this._scanResult = { files: [], ts: null };
-    this._updateTab('file-scanner');
+    this._refreshTab('file-scanner');
 
     try {
-      const configInfo = await this._hass.callApi('GET', 'config');
+      const configInfo = await hass.callApi('GET', 'config');
       const registry = async type => {
-        try { const rows = await this._hass.callWS({ type }); return Array.isArray(rows) ? rows.length : null; }
+        try { const rows = await hass.callWS({ type }); return Array.isArray(rows) ? rows.length : null; }
         catch (_) { return null; }
       };
       const [entityCount, deviceCount, areaCount] = await Promise.all([
@@ -1209,7 +1251,7 @@ class HAYamlChecker extends HTMLElement {
       let logErrors = '?';
       let logWarnings = '?';
       try {
-        const logs = await this._hass.callApi('GET', 'error_log');
+        const logs = await hass.callApi('GET', 'error_log');
         if (typeof logs === 'string') {
           logErrors = (logs.match(/ERROR/g) || []).length;
           logWarnings = (logs.match(/WARNING/g) || []).length;
@@ -1219,7 +1261,7 @@ class HAYamlChecker extends HTMLElement {
       // Check uptime via recorder / system health
       let uptime = null;
       try {
-        const sysHealth = await this._hass.callApi('GET', 'system_health');
+        const sysHealth = await hass.callApi('GET', 'system_health');
         if (sysHealth && sysHealth.homeassistant && sysHealth.homeassistant.info) {
           uptime = sysHealth.homeassistant.info.run_as_root !== undefined
             ? null
@@ -1228,16 +1270,18 @@ class HAYamlChecker extends HTMLElement {
       } catch(e) { /* no system_health */ }
 
       let scannedFiles = null;
-      if (this._hass?.user?.is_admin && this._hass?.config?.components?.includes('ha_yaml_checker')) {
+      if (hass?.user?.is_admin && hass?.config?.components?.includes('ha_yaml_checker')) {
         try {
-          const result = await this._hass.callWS({ type: 'ha_yaml_checker/scan_files' });
+          const result = await hass.callWS({ type: 'ha_yaml_checker/scan_files' });
           if (result?.schema === 'ha-yaml-file-scan-v1' && result.scope === 'top_level_syntax_only'
             && Array.isArray(result.files) && result.files.length <= HAYamlChecker.KEY_FILES.length) {
             scannedFiles = new Map(result.files.filter(row => row && typeof row.file === 'string'
               && ['pass', 'fail', 'skipped'].includes(row.status)).map(row => [row.file, row]));
           }
-        } catch (_) { /* file syntax stays unknown */ }
+        } catch (_) {
+      if (!context.current()) return; /* file syntax stays unknown */ }
       }
+      if (!context.current()) return;
       this._scanResult = {
         haVersion,
         entityCount: entityCount ?? '?',
@@ -1255,6 +1299,8 @@ class HAYamlChecker extends HTMLElement {
           column: scannedFiles?.get(f.path)?.column })),
       };
     } catch (e) {
+      if (!context.current()) return;
+      if (!context.current()) return;
       this._scanResult = {
         files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: 'unknown' })),
         ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')),
@@ -1263,54 +1309,63 @@ class HAYamlChecker extends HTMLElement {
     }
 
     this._scanLoading = false;
-    this._updateTab('file-scanner');
+    this._refreshTab('file-scanner');
   }
 
   // ── Template Tester ──────────────────────────────────────────────────────
   async _runTemplateTester() {
+    const context = this._requestContext();
+    const hass = context.hass;
     const template = this._templateValue;
     if (!template.trim()) return;
     if (this._templateLoading) return;
+    const sequence = ++this._templateCheckSeq;
     this._templateLoading = true;
     this._templateResult = null;
-    this._updateTab('template-tester');
+    this._refreshTab('template-tester');
 
     try {
-      const result = await this._hass.callApi('POST', 'template', { template });
+      const result = await hass.callApi('POST', 'template', { template });
+      if (sequence !== this._templateCheckSeq) return;
       this._templateResult = { ok: true, value: result, ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     } catch (e) {
+      if (!context.current()) return;
+      if (sequence !== this._templateCheckSeq) return;
       this._templateResult = { ok: false, error: e.message || String(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
     this._templateLoading = false;
-    this._updateTab('template-tester');
+    this._refreshTab('template-tester');
   }
 
   // ── Paste & Validate ─────────────────────────────────────────────────────
   async _runPasteValidation(value) {
+    const context = this._requestContext();
+    const hass = context.hass;
     const sequence = ++this._pasteCheckSeq;
     this._pasteValue = value;
     this._pasteValidatedValue = value;
     this._pasteErrors = this._validateYAML(value);
     this._pasteSyntax = { status: 'checking' };
-    this._updateTab('paste-validate');
-    const installed = this._hass?.config?.components?.includes('ha_yaml_checker');
-    if (!installed || !this._hass?.user?.is_admin) {
+    this._refreshTab('paste-validate');
+    const installed = hass?.config?.components?.includes('ha_yaml_checker');
+    if (!installed || !hass?.user?.is_admin) {
       this._pasteSyntax = { status: 'unsupported' };
-      this._updateTab('paste-validate');
+      this._refreshTab('paste-validate');
       return;
     }
     try {
-      const result = await this._hass.callWS({ type: 'ha_yaml_checker/check_syntax', yaml: value });
+      const result = await hass.callWS({ type: 'ha_yaml_checker/check_syntax', yaml: value });
       if (sequence !== this._pasteCheckSeq) return;
       this._pasteSyntax = result?.schema === 'ha-yaml-syntax-v1'
         && ['valid', 'invalid', 'unsupported'].includes(result.status)
         ? result : { status: 'unavailable' };
     } catch (_) {
+      if (!context.current()) return;
       if (sequence !== this._pasteCheckSeq) return;
       this._pasteSyntax = { status: 'unavailable' };
     }
-    this._updateTab('paste-validate');
+    this._refreshTab('paste-validate');
   }
 
   _validateYAML(text) {
@@ -1941,6 +1996,7 @@ ${this._css()}
           </div>
           <textarea class="yaml-textarea" id="yaml-input" placeholder="# ${this._t.pasteHint}\nautomation:\n  - alias: Test\n    trigger:\n      - platform: state\n        entity_id: light.salon">${this._esc(this._pasteValue)}</textarea>
           <button class="btn btn-primary" id="btn-validate" aria-label="${this._t.validateBtn || 'Validate YAML'}">🔍 ${this._t.validateBtn}</button>
+          <div id="paste-result">
           ${syntax ? `<div class="note-box" role="status">${syntax.status === 'valid' ? '✅' : syntax.status === 'invalid' ? '❌' : 'ℹ️'} ${syntaxLabel}${syntax.status === 'invalid' && Number.isInteger(syntax.line) ? ` — ${this._lang === 'pl' ? 'linia' : 'line'} ${syntax.line}${Number.isInteger(syntax.column) ? `:${syntax.column}` : ''}` : ''}</div>` : ''}
           ${this._pasteErrors && (errors.length || warnings.length) ? `
             <div class="paste-results">
@@ -1960,6 +2016,7 @@ ${this._css()}
             </div>
           ` : ''}
           ${this._pasteErrors && !errors.length && !warnings.length && this._pasteValue ? `<div class="note-box">ℹ️ ${this._lang === 'pl' ? 'Brak uwag heurystycznych.' : 'No heuristic warnings detected.'}</div>` : ''}
+          </div>
         </div>
       </div>
     `;
@@ -1978,6 +2035,7 @@ ${this._css()}
             <div class="paste-label" style="margin-bottom:6px;">${this._t.jinja2Template}</div>
             <textarea class="yaml-textarea" id="template-input" style="min-height:120px;" placeholder="{{ states('sun.sun') }}">${this._esc(this._templateValue)}</textarea>
           </div>
+          <div id="template-result">
           ${this._templateLoading ? '<div class="loading-wrap"><div class="spinner"></div> ' + this._t.executingTemplate + '</div>' : ''}
           ${!this._templateLoading && r ? `
             <div class="result-header ${r.ok ? 'success' : 'error'}">
@@ -1990,6 +2048,7 @@ ${this._css()}
             ${r.ok ? `<div style="background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;word-break:break-all;">${this._esc(String(r.value))}</div>` : ''}
             ${!r.ok ? `<div class="error-box">${this._esc(r.error)}</div>` : ''}
           ` : ''}
+          </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-primary" id="btn-template" aria-label="${this._t.executeTemplate || 'Execute template'}">▶️ ${this._t.executeTemplate}</button>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -2028,6 +2087,10 @@ ${this._css()}
     `;
   }
 
+  _refreshTab(tab) {
+    if (this._activeTab === tab) this._updateTab(tab);
+  }
+
   _updateTab(tab) {
     if (!this.shadowRoot) return;
     const content = this.shadowRoot.getElementById('tab-content');
@@ -2040,8 +2103,18 @@ ${this._css()}
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     });
+    const active = this.shadowRoot.activeElement;
+    const editor = active?.id === 'yaml-input' || active?.id === 'template-input';
+    const selection = editor ? {id: active.id, start: active.selectionStart,
+      end: active.selectionEnd, direction: active.selectionDirection, scrollTop: active.scrollTop} : null;
     content.innerHTML = this._renderTabContent();
     this._attachEventListeners();
+    if (selection) {
+      const current = this.shadowRoot.getElementById(selection.id);
+      current?.focus({preventScroll: true});
+      current?.setSelectionRange(selection.start, selection.end, selection.direction);
+      if (current) current.scrollTop = selection.scrollTop;
+    }
   }
 
   _supportDismissed() {
@@ -2086,6 +2159,8 @@ ${this._css()}
     // Template examples
     this.shadowRoot.querySelectorAll('.template-example').forEach(btn => {
       btn.addEventListener('click', () => {
+        this._templateCheckSeq++;
+        this._templateLoading = false;
         this._templateValue = btn.dataset.tpl;
         this._templateResult = null;
         this._updateTab('template-tester');
@@ -2094,9 +2169,9 @@ ${this._css()}
 
     // Live textarea tracking
     const yamlTA = this.shadowRoot.getElementById('yaml-input');
-    if (yamlTA) yamlTA.addEventListener('input', e => { this._pasteValue = e.target.value; });
+    if (yamlTA) yamlTA.addEventListener('input', e => { this._pasteCheckSeq++; this._pasteValue = e.target.value; this._pasteValidatedValue = this._pasteErrors = this._pasteSyntax = null; this.shadowRoot.getElementById('paste-result')?.replaceChildren(); });
     const tmplTA = this.shadowRoot.getElementById('template-input');
-    if (tmplTA) tmplTA.addEventListener('input', e => { this._templateValue = e.target.value; });
+    if (tmplTA) tmplTA.addEventListener('input', e => { this._templateCheckSeq++; this._templateLoading = false; this._templateValue = e.target.value; this._templateResult = null; this.shadowRoot.getElementById('template-result')?.replaceChildren(); });
   }
 
   _css() {
@@ -2219,7 +2294,7 @@ ${this._css()}
   }
 
   disconnectedCallback() {
-    // Cleanup any active event listeners or timers
+    this._invalidateRequests();
   }
 
   setActiveTab(tabId) {
