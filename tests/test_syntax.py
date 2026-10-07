@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -15,6 +18,21 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SyntaxTests(unittest.TestCase):
+    def test_fifo_is_skipped_without_waiting_for_a_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            os.mkfifo(root / "configuration.yaml")
+            code = ("import importlib.util,json; "
+                    f"s=importlib.util.spec_from_file_location('syntax',{str(PATH)!r}); "
+                    "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+                    f"print(json.dumps(m.scan_files(m.Path({directory!r}))))")
+            try:
+                result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                        text=True, timeout=3, check=True)
+            except subprocess.TimeoutExpired:
+                self.fail("scan_files blocks on a FIFO with no writer")
+            self.assertIn('"reason": "not_regular_file"', result.stdout)
+
     def test_valid_custom_ha_tag_is_syntax_only(self) -> None:
         self.assertEqual(MODULE.check_syntax("automation: !include automations.yaml\n")["status"], "valid")
 
