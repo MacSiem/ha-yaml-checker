@@ -10,6 +10,7 @@ test('HA template error bodies render a readable message and allow retry', async
     instance.hass = { language: 'en', user: { id: 'qa', is_admin: true }, states: {},
       config: { components: [] }, callApi: async () => { throw { body: { message: 'TemplateError: division by zero' } }; } };
     instance._templateValue = '{{ 1 / 0 }}';
+    instance._updateTab('template-tester');
     await instance._runTemplateTester();
     assert.match(instance.shadowRoot.textContent, /TemplateError: division by zero/);
     assert.doesNotMatch(instance.shadowRoot.textContent, /\[object Object\]/);
