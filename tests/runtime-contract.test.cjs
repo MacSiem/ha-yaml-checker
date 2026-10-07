@@ -7,6 +7,9 @@ const { JSDOM } = require('jsdom');
 test('HA template error bodies render a readable message and allow retry', async () => {
   const { instance, dom } = card();
   try {
+    delete instance._updateTab;
+    instance.setConfig({ type: 'custom:ha-yaml-checker', show_support: false });
+    dom.window.document.body.append(instance);
     instance.hass = { language: 'en', user: { id: 'qa', is_admin: true }, states: {},
       config: { components: [] }, callApi: async () => { throw { body: { message: 'TemplateError: division by zero' } }; } };
     instance._templateValue = '{{ 1 / 0 }}';
@@ -25,9 +28,10 @@ for (const payload of ['<img src=x onerror="alert(1)">', ['<img src=x onerror="a
     const { instance, dom } = card();
     try {
       instance._entityResult = { error: payload };
-      instance._updateTab('entity-validator');
-      assert.equal(instance.shadowRoot.querySelector('img'), null);
-      assert.match(instance.shadowRoot.textContent, /<img src=x/);
+      const view = dom.window.document.createElement('div');
+      view.innerHTML = instance._renderEntityValidator();
+      assert.equal(view.querySelector('img'), null);
+      assert.match(view.textContent, /<img src=x/);
     } finally { dom.window.close(); }
   });
 }
