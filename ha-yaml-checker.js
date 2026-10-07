@@ -2295,6 +2295,8 @@ ${this._css()}
 
   disconnectedCallback() {
     this._invalidateRequests();
+    this._firstRender = false;
+    this.shadowRoot.replaceChildren();
   }
 
   setActiveTab(tabId) {

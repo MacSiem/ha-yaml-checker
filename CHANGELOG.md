@@ -1,9 +1,10 @@
-## Unreleased
+## 5.0.0 — integration candidate (2026-10-07)
 
-- Refresh open tabs and retained validation messages after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection. Keep the last checked YAML separate from a newer draft and avoid repeating backend requests.
+- Stop parser/file commands while the integration is unloaded and recheck administrator access after pending scans. Remove only the integration-owned YAML-mode module on unload.
+- Discard stale responses after user/connection changes or disconnect, preserve the selected tab during background checks, and retain editor focus and selection.
+- Refresh open tabs and retained validation messages after ordinary Home Assistant language updates while retaining YAML/template drafts, editor focus and text selection. Clear validation results when the checked YAML draft changes and avoid repeating backend requests.
 - Localize Paste/Template/guide diagnostics per card language; retain drafts and syntax examples, and distinguish supported actions/Jinja methods from unknown functions.
 
-## 5.0.0 — integration candidate (2026-10-01)
 
 - Exclude event names, Jinja variable methods and notification icons from missing-entity results. Preserve literal template dependencies, `states.sensor.entity` references, event entity targets and scene entity-map keys.
 
