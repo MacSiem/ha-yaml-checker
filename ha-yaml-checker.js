@@ -1217,7 +1217,6 @@ class HAYamlChecker extends HTMLElement {
       };
     } catch (e) {
       if (!context.current()) return;
-      if (!context.current()) return;
       this._entityResult = { error: e.message || String(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
@@ -1279,7 +1278,9 @@ class HAYamlChecker extends HTMLElement {
               && ['pass', 'fail', 'skipped'].includes(row.status)).map(row => [row.file, row]));
           }
         } catch (_) {
-      if (!context.current()) return; /* file syntax stays unknown */ }
+          if (!context.current()) return;
+          // File syntax stays unknown when the parser cannot run.
+        }
       }
       if (!context.current()) return;
       this._scanResult = {
@@ -1299,7 +1300,6 @@ class HAYamlChecker extends HTMLElement {
           column: scannedFiles?.get(f.path)?.column })),
       };
     } catch (e) {
-      if (!context.current()) return;
       if (!context.current()) return;
       this._scanResult = {
         files: HAYamlChecker.KEY_FILES.map(f => ({ ...f, status: 'unknown' })),

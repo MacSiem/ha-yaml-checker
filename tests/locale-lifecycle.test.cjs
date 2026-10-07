@@ -183,7 +183,7 @@ test('duplicate labels and file syntax statuses follow the current locale', asyn
     tab(card, 'file-scanner'); await card._runFileScan();
     const statuses = Array.from(card.shadowRoot.querySelectorAll('.file-status-icon'));
     assert.match(statuses[0].textContent, /poprawna/);
-    assert.match(statuses.at(-1).getAttribute('title'), /Plik sekretów/);
+    assert.match(statuses.find(x => x.closest('.file-item').querySelector('.file-path').textContent === 'secrets.yaml').getAttribute('title'), /Plik sekretów/);
     assert.doesNotMatch(statuses.map(x => x.textContent+' '+x.title).join(' '), /secret_file|Top-level|skipped|unknown/);
   } finally {dom.window.close();}
 });
