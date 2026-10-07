@@ -4,6 +4,33 @@ const path = require('node:path');
 const test = require('node:test');
 const { JSDOM } = require('jsdom');
 
+test('HA template error bodies render a readable message and allow retry', async () => {
+  const { instance, dom } = card();
+  try {
+    instance.hass = { language: 'en', user: { id: 'qa', is_admin: true }, states: {},
+      config: { components: [] }, callApi: async () => { throw { body: { message: 'TemplateError: division by zero' } }; } };
+    instance._templateValue = '{{ 1 / 0 }}';
+    await instance._runTemplateTester();
+    assert.match(instance.shadowRoot.textContent, /TemplateError: division by zero/);
+    assert.doesNotMatch(instance.shadowRoot.textContent, /\[object Object\]/);
+    instance.hass = { ...instance._hass, callApi: async () => '42' };
+    await instance._runTemplateTester();
+    assert.match(instance.shadowRoot.textContent, /42/);
+  } finally { dom.window.close(); }
+});
+
+for (const payload of ['<img src=x onerror="alert(1)">', ['<img src=x onerror="alert(1)">']]) {
+  test(`entity API errors are rendered as text for ${typeof payload}`, () => {
+    const { instance, dom } = card();
+    try {
+      instance._entityResult = { error: payload };
+      instance._updateTab('entity-validator');
+      assert.equal(instance.shadowRoot.querySelector('img'), null);
+      assert.match(instance.shadowRoot.textContent, /<img src=x/);
+    } finally { dom.window.close(); }
+  });
+}
+
 test('Polish paste diagnostics use Polish text for indentation, duplicate keys and includes', () => {
   const { instance, dom } = card();
   try {
