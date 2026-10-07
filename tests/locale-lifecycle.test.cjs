@@ -123,3 +123,46 @@ test('retained own unavailable-config note follows ordinary locale changes witho
     assert.equal(requests, 1);
   } finally { dom.window.close(); }
 });
+
+function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+
+test('late paste response leaves the selected tab and template editor untouched', async () => {
+  const {card, dom, hass} = fixture(); const pending = deferred();
+  try {
+    card.hass = {...hass, config: {components: ['ha_yaml_checker']}, callWS: () => pending.promise};
+    tab(card, 'paste-validate'); const check = card._runPasteValidation('name: QA');
+    tab(card, 'template-tester'); const input = card.shadowRoot.getElementById('template-input');
+    input.value = '{{ 2 }}'; input.dispatchEvent(new dom.window.Event('input')); input.focus();
+    pending.resolve({schema: 'ha-yaml-syntax-v1', status: 'valid'}); await check;
+    assert.equal(card._activeTab, 'template-tester'); assert.equal(card.shadowRoot.activeElement, input);
+  } finally { dom.window.close(); }
+});
+
+test('editing a pending paste draft invalidates its syntax result and retains focus', async () => {
+  const {card, dom, hass} = fixture(); const pending = deferred();
+  try {
+    card.hass = {...hass, config: {components: ['ha_yaml_checker']}, callWS: () => pending.promise};
+    tab(card, 'paste-validate'); const check = card._runPasteValidation('name: QA');
+    const input = card.shadowRoot.getElementById('yaml-input'); input.value = 'x: [';
+    input.dispatchEvent(new dom.window.Event('input')); input.focus(); input.setSelectionRange(1, 3);
+    pending.resolve({schema: 'ha-yaml-syntax-v1', status: 'valid'}); await check;
+    assert.equal(card._pasteSyntax, null); assert.equal(card.shadowRoot.activeElement, input);
+    assert.equal(input.selectionStart, 1); assert.equal(input.selectionEnd, 3);
+  } finally { dom.window.close(); }
+});
+
+for (const boundary of ['user', 'disconnect']) {
+  test(`pending admin config result is discarded after ${boundary}`, async () => {
+    const {card, dom, hass} = fixture(); const pending = deferred();
+    try {
+      card.hass = {...hass, callApi: () => pending.promise}; tab(card, 'config-check');
+      const check = card._runConfigCheck();
+      if (boundary === 'user') card.hass = {...hass, user: {id: 'ordinary', is_admin: false}};
+      else card.remove();
+      const hash = dom.window.location.hash;
+      pending.resolve({result: 'invalid', errors: 'Synthetic admin detail'}); await check;
+      assert.equal(card._checkResult, null); assert.equal(dom.window.location.hash, hash);
+      assert.doesNotMatch(card.shadowRoot.textContent, /Synthetic admin detail/);
+    } finally { dom.window.close(); }
+  });
+}
