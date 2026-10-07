@@ -166,3 +166,24 @@ for (const boundary of ['user', 'disconnect']) {
     } finally { dom.window.close(); }
   });
 }
+
+test('duplicate labels and file syntax statuses follow the current locale', async () => {
+  const {card, dom, hass} = fixture();
+  try {
+    card.hass = {...hass, config: {components: ['ha_yaml_checker']},
+      states: {'automation.a': {state: 'on', attributes: {}}, 'automation.b': {state: 'on', attributes: {}}},
+      callApi: async () => ({version: 'QA'}),
+      callWS: async msg => msg.type === 'automation/config' ? {config: {id: 'duplicate', actions: []}}
+        : msg.type === 'ha_yaml_checker/scan_files' ? {schema: 'ha-yaml-file-scan-v1', scope: 'top_level_syntax_only', files: [
+          {file: 'configuration.yaml', status: 'pass'}, {file: 'secrets.yaml', status: 'skipped', reason: 'secret_file'}]} : []};
+    tab(card, 'entity-validator'); await card._runEntityValidation();
+    assert.match(card.shadowRoot.textContent, /Duplicate automation IDs/);
+    assert.doesNotMatch(card.shadowRoot.textContent, /Duplikaty|brak alias/);
+    card.hass = {...card._hass, language: 'pl'};
+    tab(card, 'file-scanner'); await card._runFileScan();
+    const statuses = Array.from(card.shadowRoot.querySelectorAll('.file-status-icon'));
+    assert.match(statuses[0].textContent, /poprawna/);
+    assert.match(statuses.at(-1).getAttribute('title'), /Plik sekretów/);
+    assert.doesNotMatch(statuses.map(x => x.textContent+' '+x.title).join(' '), /secret_file|Top-level|skipped|unknown/);
+  } finally {dom.window.close();}
+});
