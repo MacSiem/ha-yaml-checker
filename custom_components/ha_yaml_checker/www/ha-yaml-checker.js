@@ -1180,7 +1180,7 @@ class HAYamlChecker extends HTMLElement {
       // FUNC-1: Check automations without description
       const autoNoDesc = automations
         .filter(a => !a.description)
-        .map(a => ({ id: a.id || a.entity_id || '?', alias: a.alias || '(brak alias)' }));
+        .map(a => ({ id: a.id || a.entity_id || '?', alias: a.alias || null }));
 
       // Reuse the same references for detail groups so services do not reappear.
       const scriptRefs = [];
@@ -1865,7 +1865,7 @@ ${this._css()}
       </div>
       ${r.dupIds.length ? `
         <div class="issue-section">
-          <h3>⚠️ Duplikaty ID automatyzacji (${r.dupIds.length})</h3>
+          <h3>⚠️ ${this._lang === 'pl' ? 'Duplikaty ID automatyzacji' : 'Duplicate automation IDs'} (${r.dupIds.length})</h3>
           ${r.dupIds.map(d => `<div class="issue-item warning"><span class="issue-icon">⚠️</span><div><strong>${this._esc(d.id)}</strong> — ${this._esc(d.alias)}</div></div>`).join('')}
         </div>
       ` : ''}
@@ -1876,7 +1876,7 @@ ${this._css()}
           <h3>❌ ${this._t.brokenRefsTitle} (${r.broken.length})</h3>
           ${r.broken.map(b => `<div class="issue-item error"><span class="issue-icon">❌</span><div><strong>${this._esc(b.entity)}</strong> <span style="color:var(--text-secondary);font-size:11px;">${this._lang === 'pl' ? 'w' : 'in'} ${this._esc(b.type)}: ${this._esc(b.in)}</span></div></div>`).join('')}
         </div>
-      ` : r.unreadableAutomations ? '' : '<div class="all-good">✅ ' + this._t.noRefs + ' (automation config)</div>'}
+      ` : r.unreadableAutomations ? '' : '<div class="all-good">✅ ' + this._t.noRefs + (this._lang === 'pl' ? ' (konfiguracja automatyzacji)</div>' : ' (automation config)</div>')}
       ${r.problemStates?.length ? `
         <div class="issue-section">
           <h3>⚠️ ${this._t.unavailableTitle} (${r.problemStates.length})</h3>
@@ -1887,7 +1887,7 @@ ${this._css()}
       ${r.autoNoDesc?.length ? `
         <div class="issue-section">
           <h3>ℹ️ ${this._t.noDescTitle} (${r.autoNoDesc.length})</h3>
-          ${r.autoNoDesc.slice(0, 20).map(a => `<div class="issue-item info"><span class="issue-icon">ℹ️</span><div><strong>${this._esc(a.alias)}</strong> <span style="color:var(--bento-text-secondary);font-size:11px;">ID: ${this._esc(a.id)}</span></div></div>`).join('')}
+          ${r.autoNoDesc.slice(0, 20).map(a => `<div class="issue-item info"><span class="issue-icon">ℹ️</span><div><strong>${this._esc(a.alias || (this._lang === 'pl' ? '(brak aliasu)' : '(no alias)'))}</strong> <span style="color:var(--bento-text-secondary);font-size:11px;">ID: ${this._esc(a.id)}</span></div></div>`).join('')}
           ${r.autoNoDesc.length > 20 ? `<div style="padding:8px;color:var(--bento-text-secondary);font-size:12px;">${this._t.moreCount.replace('{count}', r.autoNoDesc.length - 20)}</div>` : ''}
         </div>
       ` : ''}
@@ -1972,12 +1972,36 @@ ${this._css()}
               <div class="file-path">${this._esc(f.path)}${f.critical ? '<span class="badge critical">' + this._t.critical + '</span>' : ''}</div>
               <div class="file-desc">${this._esc(this._fileDescription(f))}</div>
             </div>
-            <span class="file-status-icon" title="${this._esc(f.reason || (f.status === 'pass' ? 'Top-level YAML syntax only; includes not followed' : f.status))}">${f.status === 'pass' ? '✅' : f.status === 'fail' ? '❌' : f.status === 'skipped' ? '➖' : '❓'} ${this._esc(f.status)}${f.status === 'fail' && Number.isInteger(f.line) ? ` ${f.line}${Number.isInteger(f.column) ? `:${f.column}` : ''}` : ''}</span>
+            <span class="file-status-icon" title="${this._esc(this._fileStatusReason(f))}">${f.status === 'pass' ? '✅' : f.status === 'fail' ? '❌' : f.status === 'skipped' ? '➖' : '❓'} ${this._esc(this._fileStatusLabel(f.status))}${f.status === 'fail' && Number.isInteger(f.line) ? ` ${f.line}${Number.isInteger(f.column) ? `:${f.column}` : ''}` : ''}</span>
           </div>
         `).join('')}
       </div>
       <div class="note-box" style="margin-top:12px;">💡 ${this._lang === 'pl' ? 'Status pliku dotyczy tylko składni YAML na najwyższym poziomie; !include i poprawność konfiguracji HA wymagają osobnego sprawdzenia. secrets.yaml nie jest czytany.' : 'File status covers top-level YAML syntax only; !include and HA configuration validity require a separate check. secrets.yaml is never read.'}</div>
     `;
+  }
+
+  _fileStatusLabel(status) {
+    const labels = {pass: ['składnia poprawna', 'syntax valid'], fail: ['błąd składni', 'syntax error'],
+      skipped: ['pominięty', 'skipped'], unknown: ['niezweryfikowany', 'not verified']};
+    return (labels[status] || labels.unknown)[this._lang === 'pl' ? 0 : 1];
+  }
+
+  _fileStatusReason(file) {
+    const reasons = {
+      secret_file: ['Plik sekretów nie jest czytany', 'Secrets file is never read'],
+      missing: ['Brak pliku', 'File is missing'],
+      unreadable_or_symlink: ['Plik niedostępny lub dowiązanie symboliczne', 'Unreadable file or symbolic link'],
+      not_regular_file: ['To nie jest zwykły plik', 'Not a regular file'],
+      too_large: ['Plik przekracza limit rozmiaru', 'File exceeds the size limit'],
+      too_complex: ['Plik przekracza limit złożoności', 'File exceeds the complexity limit'],
+      invalid_encoding: ['Nieprawidłowe kodowanie UTF-8', 'Invalid UTF-8 encoding'],
+      read_error: ['Nie udało się odczytać pliku', 'Could not read the file'],
+    };
+    if (reasons[file.reason]) return reasons[file.reason][this._lang === 'pl' ? 0 : 1];
+    if (file.status === 'pass') return this._lang === 'pl'
+      ? 'Tylko składnia YAML najwyższego poziomu; bez śledzenia !include'
+      : 'Top-level YAML syntax only; includes not followed';
+    return this._fileStatusLabel(file.status);
   }
 
   _renderPasteValidate() {

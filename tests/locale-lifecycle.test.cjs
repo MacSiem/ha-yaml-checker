@@ -177,8 +177,8 @@ test('duplicate labels and file syntax statuses follow the current locale', asyn
         : msg.type === 'ha_yaml_checker/scan_files' ? {schema: 'ha-yaml-file-scan-v1', scope: 'top_level_syntax_only', files: [
           {file: 'configuration.yaml', status: 'pass'}, {file: 'secrets.yaml', status: 'skipped', reason: 'secret_file'}]} : []};
     tab(card, 'entity-validator'); await card._runEntityValidation();
-    assert.match(card.shadowRoot.textContent, /Duplicate automation IDs/);
-    assert.doesNotMatch(card.shadowRoot.textContent, /Duplikaty|brak alias/);
+    assert.match(card.shadowRoot.getElementById('tab-content').textContent, /Duplicate automation IDs/);
+    assert.doesNotMatch(card.shadowRoot.getElementById('tab-content').textContent, /Duplikaty|brak alias/);
     card.hass = {...card._hass, language: 'pl'};
     tab(card, 'file-scanner'); await card._runFileScan();
     const statuses = Array.from(card.shadowRoot.querySelectorAll('.file-status-icon'));
