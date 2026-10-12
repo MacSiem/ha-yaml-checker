@@ -981,7 +981,9 @@ class HAYamlChecker extends HTMLElement {
     this._reportRevision = 0;
     this._reportConnectionEpoch = 0;
     this._exportDialog = null;
-    this._reportOffline = () => this._onReportConnectionChange();
+    this._reportOffline = event => this._onReportConnectionChange(event);
+    this._reportEventConnected = undefined;
+    this._reportBrowserOnline = true;
     this._templateCheckSeq = 0;
     this._config = {};
     this._activeTab = 'config-check';
@@ -1464,7 +1466,7 @@ class HAYamlChecker extends HTMLElement {
       userId: hass?.user?.id || (hass?.user ? 'local-session' : 'no-user'),
       connectionId: 'yaml-connection-' + this._reportConnectionEpoch,
       datasetId: 'yaml-check-observations', revision: this._reportRevision,
-      connected: this.isConnected && !!hass && hass?.connection?.connected !== false && navigator.onLine !== false,
+      connected: this._reportOnline(),
       canExport: !!hass?.user, sourceConfirmed: this._yamlReports.hasObserved(),
     };
   }
@@ -1497,7 +1499,16 @@ class HAYamlChecker extends HTMLElement {
   }
 
 
-  _onReportConnectionChange() {
+  _reportOnline() {
+    return this.isConnected && !!this._hass && this._hass?.connection?.connected !== false
+      && this._reportEventConnected !== false && this._reportBrowserOnline !== false && navigator.onLine !== false;
+  }
+
+  _onReportConnectionChange(event) {
+    if (event?.type === 'disconnected') this._reportEventConnected = false;
+    if (event?.type === 'ready') this._reportEventConnected = true;
+    if (event?.type === 'offline') this._reportBrowserOnline = false;
+    if (event?.type === 'online') this._reportBrowserOnline = true;
     this._reportConnectionEpoch++;
     this._reportConnected = !!this._hass && this._hass?.connection?.connected !== false;
     this._invalidateRequests();
@@ -1510,6 +1521,7 @@ class HAYamlChecker extends HTMLElement {
       this._reportEventConnection.removeEventListener(event, this._reportOffline);
     }
     this._reportEventConnection = null;
+    this._reportEventConnected = undefined;
     if (typeof connection?.addEventListener === 'function' && typeof connection?.removeEventListener === 'function') {
       this._reportEventConnection = connection;
       for (const event of ['ready','disconnected']) connection.addEventListener(event, this._reportOffline);
@@ -1525,7 +1537,7 @@ class HAYamlChecker extends HTMLElement {
   _requestContext() {
     const epoch = this._requestEpoch;
     const source = this._hass;
-    const current = () => epoch === this._requestEpoch;
+    const current = () => epoch === this._requestEpoch && this._reportOnline();
     const guarded = method => async (...args) => {
       if (!current()) throw Error('Request cancelled');
       const result = await source[method](...args);
@@ -1546,6 +1558,7 @@ class HAYamlChecker extends HTMLElement {
   async _runConfigCheck() {
     const context = this._requestContext();
     const hass = context.hass;
+    if (!this._reportOnline()) return;
     if (hass?.user?.is_admin !== true || this._checkLoading) return;
     this._checkLoading = true;
     const reportToken = this._beginReport('config');
@@ -1657,6 +1670,7 @@ class HAYamlChecker extends HTMLElement {
   async _runEntityValidation() {
     const context = this._requestContext();
     const hass = context.hass;
+    if (!this._reportOnline()) return;
     if (this._entityLoading) return;
     this._entityLoading = true;
     const reportToken = this._beginReport('entities');
@@ -1793,6 +1807,7 @@ class HAYamlChecker extends HTMLElement {
   async _runFileScan() {
     const context = this._requestContext();
     const hass = context.hass;
+    if (!this._reportOnline()) return;
     if (this._scanLoading) return;
     this._scanLoading = true;
     const reportToken = this._beginReport('files');
@@ -1885,6 +1900,7 @@ class HAYamlChecker extends HTMLElement {
     const hass = context.hass;
     const template = this._templateValue;
     if (!template.trim()) return;
+    if (!this._reportOnline()) return;
     if (this._templateLoading) return;
     const sequence = ++this._templateCheckSeq;
     this._templateLoading = true;
@@ -1911,6 +1927,7 @@ class HAYamlChecker extends HTMLElement {
   async _runPasteValidation(value) {
     const context = this._requestContext();
     const hass = context.hass;
+    if (!this._reportOnline()) return;
     const sequence = ++this._pasteCheckSeq;
     const reportToken = this._beginReport('paste');
     this._pasteValue = value;
