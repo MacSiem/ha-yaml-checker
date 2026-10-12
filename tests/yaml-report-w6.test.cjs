@@ -272,3 +272,10 @@ test('location cap preserves measured counts and incomplete coverage without inv
  let row=JSON.parse(r.build({format:'json',language:'en'}).serialized).checks[3];assert.equal(row.metrics.errors,501);assert.equal(row.locations.length,500);assert.equal(row.locationCoverage,'partial');
  finish(r,'paste',{syntax:{status:'invalid',line:0,column:3},heuristic:{lineCount:4,errors:[{line:'3',msg:poison}],warnings:[]}});row=JSON.parse(r.build({format:'json',language:'en'}).serialized).checks[3];assert.deepEqual(row.locations,[]);assert.equal(row.locationCoverage,'partial');
 });
+
+test('native parser errors are separate from zero heuristic errors, and missing native message fields are not zero',()=>{
+ const r=reports();finish(r,'paste',{syntax:{status:'invalid',line:7,column:3},heuristic:{lineCount:9,errors:[],warnings:[]}});finish(r,'config',{ok:true,raw:{result:'valid'}});
+ let d=JSON.parse(r.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[3].metrics.errors,0);assert.equal(d.checks[3].metrics.syntaxErrors,1);assert.equal(d.checks[3].status,'error');assert.equal(d.checks[0].metrics.errors,null);assert.equal(d.checks[0].metrics.warnings,null);
+ finish(r,'paste',{syntax:{status:'valid'},heuristic:{lineCount:1,errors:[],warnings:[]}});d=JSON.parse(r.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[3].metrics.syntaxErrors,0);
+ finish(r,'paste',{syntax:{status:'unavailable'},heuristic:{lineCount:1,errors:[],warnings:[]}});d=JSON.parse(r.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[3].metrics.syntaxErrors,null);
+});
