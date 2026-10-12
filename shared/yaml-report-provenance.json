@@ -17,8 +17,8 @@
       "transform": "remove only export keyword"
     },
     "shared/ha-yaml-reports.js": {
-      "sourceSha256": "0067a46cf39d998a8fe634dbf45b0766dda8843052780e1e8706be2b2416170a",
-      "runtimeSha256": "861947b3ef53e664656afdd8e74f1f77bf4ff4d8051f95d36f2c3f00ffa3b83d",
+      "sourceSha256": "5612f309cd05b2a2031b2cfe4a889282a42e84c7e5ede8eb7763f0aa37e94d25",
+      "runtimeSha256": "f85fdda5e2299546818d91f30b582812dae6b95e5c209baa182fec2c71f13bb8",
       "origin": "YAML Checker reviewed explicit report policy",
       "transform": "strip Node-only footer"
     }

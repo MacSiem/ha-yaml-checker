@@ -15,16 +15,16 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     files: {method:'explicit registry/log counts and ha_yaml_checker/scan_files',source:'ha_registry_and_top_level_syntax',metrics:['files','checks','errors','skipped','notChecked','entities','devices','areas','logErrors','logWarnings','components'],
       en:'Top-level syntax only; includes and secrets are not validated; registry/log counts may be unavailable. fileSlot follows the 1-based top-level list shown by the checker; locations cover observed diagnostics only, capped at 500. No file paths, log content, HA address or configuration.',
       pl:'Tylko składnia plików głównych; dołączenia i sekrety nie są walidowane; liczniki rejestrów/logów mogą być niedostępne. fileSlot to pozycja od 1 na liście plików głównych karty; lokalizacje obejmują tylko zaobserwowane diagnozy, limit 500. Bez ścieżek, treści logów, adresu HA i konfiguracji.'},
-    paste: {method:'explicit local heuristics and ha_yaml_checker/check_syntax',source:'local_heuristics_and_optional_ha_syntax',metrics:['checks','lines','errors','warnings','skipped','notChecked'],
-      en:'Local heuristic counts plus optional HA syntax parser; no schema/integration validation or included files. Available line/column numbers cover observed diagnostics only, capped at 500. No pasted YAML or diagnostic messages.',
-      pl:'Liczniki lokalnych heurystyk i opcjonalny parser składni HA; bez walidacji schematu/integracji i dołączonych plików. Dostępne numery wiersza/kolumny obejmują tylko zaobserwowane diagnozy, limit 500. Bez wklejonego YAML i komunikatów diagnostycznych.'},
+    paste: {method:'explicit local heuristics and ha_yaml_checker/check_syntax',source:'local_heuristics_and_optional_ha_syntax',metrics:['checks','lines','errors','warnings','syntaxErrors','skipped','notChecked'],
+      en:'Local heuristic counts (errors/warnings) plus optional HA syntax parser (syntaxErrors is the first parser diagnostic); no schema/integration validation or included files. Available line/column numbers cover observed diagnostics only, capped at 500. No pasted YAML or diagnostic messages.',
+      pl:'Liczniki lokalnych heurystyk (errors/warnings) i opcjonalny parser składni HA (syntaxErrors to pierwsza diagnoza parsera); bez walidacji schematu/integracji i dołączonych plików. Dostępne numery wiersza/kolumny obejmują tylko zaobserwowane diagnozy, limit 500. Bez wklejonego YAML i komunikatów diagnostycznych.'},
     template: {method:'POST template',source:'ha_template_invocation',metrics:['checks','errors','skipped','notChecked'],
       en:'Template API invocation status only; does not validate configuration or template semantics. No template input, output or error message.',
       pl:'Tylko status wywołania API szablonów; nie waliduje konfiguracji ani znaczenia szablonu. Bez treści, wyniku i komunikatu błędu szablonu.'},
   };
   const count = v => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
   const length = v => Array.isArray(v) ? v.length : null;
-  const messages = v => v === null || v === undefined ? 0 : typeof v === 'string' ? v.split('\n').filter(x=>x.trim()).length : Array.isArray(v) ? v.length : null;
+  const messages = v => v === null ? 0 : v === undefined ? null : typeof v === 'string' ? v.split('\n').filter(x=>x.trim()).length : Array.isArray(v) ? v.length : null;
   let epoch=0, ordinal=0;
   const observations = new Map();
   const nullMetrics = scope => Object.fromEntries(definitions[scope].metrics.map(key=>[key,null]));
@@ -85,6 +85,7 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
       status=m.errors>0?'error':m.checks===0?'unconfirmed':m.skipped>0||m.notChecked>0||['entities','devices','areas','logErrors','logWarnings','components'].some(k=>m[k]===null)?'partial':'success';
     } else if (scope==='paste') {
       const syntax=r.syntax?.status;
+      m.syntaxErrors=syntax==='invalid'?1:syntax==='valid'?0:null;
       m.lines=count(r.heuristic?.lineCount);m.errors=length(r.heuristic?.errors);m.warnings=length(r.heuristic?.warnings);
       m.checks=['valid','invalid'].includes(syntax)?1:0;m.skipped=syntax==='unsupported'?1:0;m.notChecked=m.checks===0?1:0;
       status=syntax==='invalid'?'error':syntax==='valid'?(m.lines===null||m.errors===null||m.warnings===null?'unconfirmed':m.errors>0||m.warnings>0?'partial':'success'):syntax==='unsupported'?'partial':'unconfirmed';
