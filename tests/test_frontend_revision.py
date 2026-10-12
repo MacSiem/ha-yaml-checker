@@ -25,7 +25,11 @@ class FrontendRevisionTests(unittest.IsolatedAsyncioTestCase):
             card.write_bytes(b"candidate card")
             namespace = {"Path": Path, "hashlib": hashlib, "__file__": str(root / "frontend.py"),
                          "CARD_FILENAME": "card.js", "CARD_URL": "/yaml/card.js", "VERSION": "test"}
-            exec(compile(ast.Module(body=[function], type_ignores=[]), str(SOURCE), "exec"), namespace)
+            # Keep source compiler semantics when extracting one function: its HA type
+            # annotations are deliberately postponed by the original module.
+            futures = [node for node in tree.body if isinstance(node, ast.ImportFrom)
+                       and node.module == "__future__"]
+            exec(compile(ast.Module(body=[*futures, function], type_ignores=[]), str(SOURCE), "exec"), namespace)
             main_thread = threading.current_thread()
             original = Path.read_bytes
 
