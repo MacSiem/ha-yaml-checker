@@ -2,6 +2,457 @@
 (function() {
 'use strict';
 
+// BEGIN HA TOOLS UI V3 source-sha256=029c06206e55abad9aa09dfcf65bb13027ec24ce6a0bfacc45a938891b27254e
+// HA Tools v3: vendored inside each consumer's own closure, never a window API.
+function createUiV3({ language = 'en' } = {}) {
+  const pl = String(language).startsWith('pl');
+  const states = {
+    success: ['Success', 'Sukces', '✓'],
+    partial: ['Partial', 'Częściowo', '½'],
+    unconfirmed: ['Unconfirmed', 'Niepotwierdzony', '?'],
+    error: ['Error', 'Błąd', '✕'],
+    not_checked: ['Not checked', 'Nie sprawdzono', '–'],
+    no_data: ['No data', 'Brak danych', '∅'],
+  };
+  const status = (value) => {
+    const code = typeof value === 'string' && Object.hasOwn(states, value) ? value : 'not_checked';
+    const row = states[code];
+    return { code, label: row[pl ? 1 : 0], icon: row[2], countsAsSuccess: code === 'success' };
+  };
+  const statusHtml = (value) => {
+    const result = status(value);
+    return `<span class="ht-result-state ht-result-state--${result.code}" data-result-state="${result.code}"><span aria-hidden="true">${result.icon}</span> ${result.label}</span>`;
+  };
+  const css = `
+.ht-result-state { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-size:12px;line-height:1.4;white-space:normal; }
+.ht-result-state--success { color:#237b3d;background:rgba(35,123,61,.10); }
+.ht-result-state--partial { color:#966400;background:rgba(150,100,0,.10); }
+.ht-result-state--unconfirmed { color:#ad5200;background:rgba(173,82,0,.10); }
+.ht-result-state--error { color:#c32b2b;background:rgba(195,43,43,.10); }
+.ht-result-state--not_checked,.ht-result-state--no_data { color:var(--secondary-text-color,#666);background:transparent; }
+.ht-result-state--no_data { border-style:dashed; }
+:host(.bento-dark) .ht-result-state--success { color:#81cf99; }
+:host(.bento-dark) .ht-result-state--partial { color:#efd080; }
+:host(.bento-dark) .ht-result-state--unconfirmed { color:#ffb97b; }
+:host(.bento-dark) .ht-result-state--error { color:#ff9999; }
+`;
+  return { status, statusHtml, css };
+}
+// END HA TOOLS UI V3
+
+// BEGIN HA TOOLS EXPORT V3 source-sha256=1f9e9c5444ec3b6de44eec136f14ae9e7d89dae1002650b33f746ab9633982f1
+/**
+ * W6 export dialog. Pure ES module; vendor this factory INSIDE each consumer's
+ * own IIFE (remove only the `export` keyword). Never attach it to window.
+ * Construction is inert. open() appends only its own container to root.
+ *
+ * Required dependency injection:
+ * root: Element/ShadowRoot; getLanguage(): 'pl'|'en'; createUiV3: existing W4 factory.
+ * getContext(): {role,userId,connectionId,datasetId,revision,connected,canExport,
+ *                sourceConfirmed}. Identities/revision are nonempty scalar values;
+ * bump revision monotonically for source/filter/selection/identity changes,
+ * including a restored source; never reuse an old revision. Never return tokens or data.
+ * policy: {id,allowlistedFields:string[],neverInclude:[tokens,users,addresses,raw_config]}.
+ * formats: explicit subset of ['json','csv','txt']; defaults must be explicit valid choices.
+ * buildPayload({context,draft,policy,signal}): read-only, Promise or sync result:
+ * {serialized:string,confirmed:true,sourceConfirmed:true,status:'success'|'partial',
+ *  included:string[],excluded:string[],sourceLimit:string}.
+ * Included/Excluded/sourceLimit describe the REVIEWED CONSUMER policy and actual
+ * source limitations in the current language. The consumer MUST explicitly select
+ * allowed fields, exclude tokens/users/addresses/raw configuration under EVERY
+ * private opt-in, and sanitize CSV formula cells where applicable. A generic
+ * recursive export/redactor of arbitrary raw state/config is NOT a valid consumer.
+ * This factory cannot inspect or truthfully sanitize an unknown arbitrary schema.
+ * For partial reports the consumer also encodes the partial status, inclusion
+ * scope and source limitations IN its allowlisted file schema, not only UI text.
+ * performDownload({serialized,blob,filename,format,context,signal}): explicit Save
+ * only. Return {outcome:'initiated'|'saved'|'unknown'}; 'saved' requires actual
+ * adapter confirmation, never infer disk persistence from an anchor click.
+ * Optional clock(): monotonic milliseconds; setTimer(fn,ms), clearTimer(handle).
+ *
+ * Returned API: open({opener}), cancel(), contextChanged(), destroy(). Every open
+ * resets private consent. contextChanged() discards bytes/consent immediately;
+ * owner also calls cancel/destroy on disconnect. Save ALWAYS rechecks context.
+ * One preview on open, explicit Refresh thereafter; bounded 10s, no automatic
+ * retries/downloads/persistence. AbortSignal is advisory; late results are ignored.
+ */
+function createExportDialog(options) {
+  const { root, getContext, getLanguage, createUiV3, buildPayload, performDownload,
+    clock = () => globalThis.performance.now(), setTimer = (fn, ms) => globalThis.setTimeout(fn, ms),
+    clearTimer = id => globalThis.clearTimeout(id), defaultFormat, defaultFilename } = options || {};
+  const allowedFormats = ['json', 'csv', 'txt', 'yaml'];
+  const excludedCategories = ['tokens', 'users', 'addresses', 'raw_config'];
+  const strings = value => Array.isArray(value) && value.length > 0 && value.every(v => typeof v === 'string' && v.trim());
+  if (!root?.append || !root.ownerDocument || [getContext, getLanguage, createUiV3, buildPayload, performDownload, clock, setTimer, clearTimer].some(fn => typeof fn !== 'function')) {
+    throw new TypeError('root and injected getContext/getLanguage/createUiV3/buildPayload/performDownload/clock/timers are required');
+  }
+  const suppliedPolicy = options.policy;
+  if (!suppliedPolicy || typeof suppliedPolicy.id !== 'string' || !suppliedPolicy.id.trim() || !strings(suppliedPolicy.allowlistedFields) || !strings(suppliedPolicy.neverInclude) || excludedCategories.some(key => !suppliedPolicy.neverInclude.includes(key))) {
+    throw new TypeError('Explicit reviewed consumer policy with allowlistedFields and neverInclude is required');
+  }
+  const policy = Object.freeze({ id: suppliedPolicy.id, allowlistedFields: Object.freeze([...suppliedPolicy.allowlistedFields]), neverInclude: Object.freeze([...suppliedPolicy.neverInclude]) });
+  if (!strings(options.formats) || options.formats.some(f => !allowedFormats.includes(f)) || new Set(options.formats).size !== options.formats.length || !options.formats.includes(defaultFormat) || typeof defaultFilename !== 'string') {
+    throw new TypeError('Explicit formats/defaultFormat/defaultFilename are required');
+  }
+  const formats = Object.freeze([...options.formats]);
+  const doc = root.ownerDocument;
+  const mime = { json: 'application/json;charset=utf-8', csv: 'text/csv;charset=utf-8', txt: 'text/plain;charset=utf-8', yaml: 'application/yaml;charset=utf-8' };
+  const copy = {
+    en: { title: 'Export', filename: 'Filename', format: 'Format', private: 'Include reviewed private fields (this export only)', included: 'Included in the file', excluded: 'Excluded from the file', source: 'Source and limits', preview: 'Exact file content', save: 'Save', refresh: 'Refresh preview', cancel: 'Cancel', busy: 'Building preview… Save waits for confirmed bytes.', changed: 'Choices changed. Refresh preview before Save.', context: 'Source or access changed. Review the source and refresh preview.', unavailable: 'Source unavailable or unconfirmed. Reconnect or confirm the source, then refresh.', invalidFormat: 'Choose an allowed format: JSON, CSV, TXT or YAML as offered.', invalidName: 'Use a basename of 1–128 characters: no paths, control characters, reserved names or leading/trailing spaces.', extension: 'Filename must end with the selected extension. Edit the filename, then refresh.', timeout: 'Preview exceeded 10 seconds. Check the source and explicitly refresh.', buildError: 'Could not build a confirmed preview. Check the source and refresh.', unconfirmed: 'Bytes or source metadata are unconfirmed. Confirm the source and refresh.', noData: 'No confirmed file content. Select available data and refresh.', saving: 'Handing off the confirmed preview… Wait for the adapter result.', initiated: 'Download initiated. Saving to the filesystem is not confirmed. Refresh only for a new export intent.', saved: 'Save confirmed by the download adapter.', unknown: 'Download result unconfirmed. Check the previous attempt before explicitly refreshing for a new export intent.' },
+    pl: { title: 'Eksport', filename: 'Nazwa pliku', format: 'Format', private: 'Dołącz sprawdzone pola prywatne (tylko ten eksport)', included: 'W pliku jest', excluded: 'W pliku nie ma', source: 'Źródło i ograniczenia', preview: 'Dokładna zawartość pliku', save: 'Zapisz', refresh: 'Odśwież podgląd', cancel: 'Anuluj', busy: 'Przygotowywanie podglądu… Zapis wymaga potwierdzonej zawartości.', changed: 'Wybór zmieniony. Odśwież podgląd przed zapisem.', context: 'Źródło lub uprawnienia zmienione. Sprawdź źródło i odśwież podgląd.', unavailable: 'Źródło niedostępne lub niepotwierdzone. Połącz lub potwierdź źródło i odśwież.', invalidFormat: 'Wybierz dostępny format: JSON, CSV, TXT lub YAML z listy.', invalidName: 'Użyj nazwy pliku o długości 1–128 znaków: bez ścieżek, znaków sterujących, nazw zastrzeżonych i skrajnych spacji.', extension: 'Nazwa pliku musi mieć rozszerzenie wybranego formatu. Popraw nazwę i odśwież.', timeout: 'Podgląd przekroczył 10 sekund. Sprawdź źródło i jawnie odśwież.', buildError: 'Nie udało się przygotować potwierdzonego podglądu. Sprawdź źródło i odśwież.', unconfirmed: 'Zawartość lub opis źródła niepotwierdzony. Potwierdź źródło i odśwież.', noData: 'Brak potwierdzonej zawartości pliku. Wybierz dostępne dane i odśwież.', saving: 'Przekazywanie potwierdzonego podglądu… Poczekaj na wynik zapisu.', initiated: 'Pobieranie rozpoczęte. Zapis na dysku nie jest potwierdzony. Odśwież tylko dla nowej próby eksportu.', saved: 'Adapter pobierania potwierdził zapis.', unknown: 'Wynik pobierania niepotwierdzony. Sprawdź poprzednią próbę przed jawnym odświeżeniem dla nowego eksportu.' },
+  };
+  const css = `
+[data-ha-tools-export] { container-type:inline-size;min-width:0;max-width:100%;color:var(--primary-text-color,inherit);font:inherit; }
+[data-ha-tools-export] * { box-sizing:border-box; }
+[data-ha-tools-export] [role=dialog] { width:100%;min-width:0;border:1px solid var(--divider-color,#aaa);border-radius:12px;background:var(--card-background-color,#fff);padding:16px; }
+[data-ha-tools-export] h2,[data-ha-tools-export] h3,[data-ha-tools-export] p,[data-ha-tools-export] li { overflow-wrap:anywhere;white-space:normal; }
+[data-ha-tools-export] h2 { margin:0 0 12px;font-size:1.25em; }
+[data-ha-tools-export] h3 { margin:12px 0 6px;font-size:1em; }
+[data-ha-tools-export] .ht-export-fields { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px; }
+[data-ha-tools-export] label { display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere; }
+[data-ha-tools-export] .ht-export-private { flex-direction:row;align-items:center;min-height:44px;margin-top:12px; }
+[data-ha-tools-export] input:not([type=checkbox]),[data-ha-tools-export] select,[data-ha-tools-export] button { font:inherit;min-width:44px;min-height:44px;max-width:100%; }
+[data-ha-tools-export] input:not([type=checkbox]),[data-ha-tools-export] select { width:100%;color:inherit;background:var(--secondary-background-color,var(--card-background-color,#f5f5f5));border:1px solid var(--divider-color,#aaa);border-radius:6px;padding:8px; }
+[data-ha-tools-export] input[type=checkbox] { width:24px;height:24px;flex:none;margin:10px; }
+[data-ha-tools-export] button { padding:8px 12px;white-space:normal;overflow-wrap:anywhere;cursor:pointer;border:1px solid var(--divider-color,#aaa);border-radius:6px;color:inherit;background:var(--secondary-background-color,var(--card-background-color,#f5f5f5)); }
+[data-ha-tools-export] :focus-visible { outline:3px solid var(--primary-color,#1769aa);outline-offset:2px; }
+[data-ha-tools-export] button:disabled { cursor:default;opacity:.6; }
+[data-ha-tools-export] .ht-export-actions { display:flex;flex-wrap:wrap;gap:8px;margin-top:16px; }
+[data-ha-tools-export] pre { max-width:100%;min-width:0;max-height:320px;overflow:auto;white-space:pre;margin:0;padding:12px;border:1px solid var(--divider-color,#aaa);background:var(--secondary-background-color,var(--card-background-color,#f5f5f5)); }
+[data-ha-tools-export] ul { padding-inline-start:22px;margin:0; }
+@container (max-width:499px) { [data-ha-tools-export] .ht-export-fields { grid-template-columns:minmax(0,1fr); } }
+@container (max-width:319px) { [data-ha-tools-export] [role=dialog] { padding:10px; } [data-ha-tools-export] .ht-export-actions button { flex:1 1 100%; } }
+`;
+  let container, nodes, L, ui, opener, alive = false, destroyed = false, serial = 0;
+  let pending = null, handoff = null, ready = null, observed = null;
+  const listeners = [];
+  const on = (target, event, handler, capture = false) => {
+    target.addEventListener(event, handler, capture);
+    listeners.push(() => target.removeEventListener(event, handler, capture));
+  };
+  const contextKeys = ['role', 'userId', 'connectionId', 'datasetId', 'revision'];
+  function readContext() {
+    try {
+      const value = getContext();
+      if (!value || contextKeys.some(k => !['string', 'number'].includes(typeof value[k]) || String(value[k]).trim() === '' || (typeof value[k] === 'number' && !Number.isFinite(value[k])))) return null;
+      return Object.freeze(Object.fromEntries([...contextKeys, 'connected', 'canExport', 'sourceConfirmed'].map(k => [k, value[k]])));
+    } catch { return null; }
+  }
+  const same = (a, b) => !!a && !!b && [...contextKeys, 'connected', 'canExport', 'sourceConfirmed'].every(k => a[k] === b[k]);
+  const available = c => !!c && c.connected === true && c.canExport === true && c.sourceConfirmed === true;
+  const draft = () => Object.freeze({ filename: nodes.filename.value, format: nodes.format.value, includePrivate: nodes.private.checked });
+  const sameDraft = (a, b) => a.filename === b.filename && a.format === b.format && a.includePrivate === b.includePrivate;
+  function validation(value) {
+    if (!formats.includes(value.format)) return 'invalidFormat';
+    const name = value.filename;
+    if (!name || [...name].length > 128 || name !== name.trim() || /[\p{Cc}\p{Cf}/\\<>:"|?*]/u.test(name) || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(?:\.|$)/i.test(name)) return 'invalidName';
+    if (!name.endsWith(`.${value.format}`) || name.length <= value.format.length + 1) return 'extension';
+    return null;
+  }
+  function status(code, message) {
+    if (!alive) return;
+    const result = ui.status(code); // exact existing W4 labels/icons/codes
+    nodes.status.className = `ht-result-state ht-result-state--${result.code}`;
+    nodes.status.dataset.resultState = result.code;
+    nodes.status.replaceChildren();
+    const icon = doc.createElement('span'); icon.setAttribute('aria-hidden', 'true'); icon.textContent = result.icon;
+    nodes.status.append(icon, doc.createTextNode(` ${result.label}`));
+    nodes.message.textContent = ` ${L[message]}`;
+    nodes.save.disabled = !ready || !!pending || !!handoff;
+    nodes.refresh.disabled = !!pending || !!handoff;
+  }
+  function stop(job) {
+    if (!job) return;
+    if (job.timer !== null) clearTimer(job.timer);
+    job.timer = null; job.controller.abort();
+  }
+  function discard(resetPrivate = false) {
+    serial++; stop(pending); pending = null; ready = null;
+    if (alive) {
+      nodes.preview.textContent = ''; nodes.included.replaceChildren(); nodes.excluded.replaceChildren(); nodes['source-limit'].textContent = '';
+      if (resetPrivate) nodes.private.checked = false;
+    }
+  }
+  function contextChanged() {
+    if (!alive) return;
+    observed = readContext(); discard(true);
+    // Once a handoff began we cannot retract a browser download. Ignore its late
+    // callback and retain the prohibition on a second write until it settles.
+    if (handoff) handoff.controller.abort();
+    status(root.isConnected && available(observed) ? 'unconfirmed' : 'no_data', 'context');
+  }
+  function validContext(original) {
+    const current = readContext();
+    if (!root.isConnected || !same(original, current) || !available(current)) { contextChanged(); return false; }
+    return true;
+  }
+  function changeDraft() {
+    if (!alive) return;
+    if (!same(observed, readContext())) { contextChanged(); return; }
+    discard();
+    const error = validation(draft()); status(error ? 'error' : 'not_checked', error || 'changed');
+  }
+  function fillList(node, items) {
+    node.replaceChildren(...items.map(text => { const li = doc.createElement('li'); li.textContent = text; return li; }));
+  }
+  async function refresh() {
+    if (!alive || pending || handoff) return;
+    const current = readContext();
+    if (!same(observed, current)) { observed = current; discard(true); }
+    const value = draft(), error = validation(value);
+    discard();
+    if (error) { status('error', error); return; }
+    if (!root.isConnected || !available(current)) { status(!root.isConnected || current?.connected === false ? 'no_data' : 'unconfirmed', 'unavailable'); return; }
+    observed = current;
+    const job = { id: serial, context: current, draft: value, started: clock(), controller: new globalThis.AbortController(), timer: null };
+    pending = job; status('not_checked', 'busy');
+    const timeout = () => {
+      if (!alive || pending !== job) return;
+      discard(); status('unconfirmed', 'timeout');
+    };
+    job.timer = setTimer(timeout, 10000);
+    try {
+      const payload = await buildPayload(Object.freeze({ context: current, draft: value, policy, signal: job.controller.signal }));
+      if (!alive || pending !== job || job.id !== serial) return;
+      if (clock() - job.started >= 10000) { timeout(); return; }
+      if (!validContext(current)) return;
+      clearTimer(job.timer); job.timer = null;
+      if (!sameDraft(value, draft())) { changeDraft(); return; }
+      const { serialized, confirmed, sourceConfirmed, status: resultState, included, excluded, sourceLimit } = payload || {};
+      if (resultState === 'no_data' || serialized === '') { pending = null; status('no_data', 'noData'); return; }
+      if (confirmed !== true || sourceConfirmed !== true || !['success', 'partial'].includes(resultState) || typeof serialized !== 'string' || !strings(included) || !strings(excluded) || typeof sourceLimit !== 'string' || !sourceLimit.trim()) {
+        pending = null; status('unconfirmed', 'unconfirmed'); return;
+      }
+      // Freeze the only serialized bytes and build the only Blob NOW; Save never
+      // re-runs serialization or builds a second payload from potentially newer data.
+      ready = Object.freeze({ serialized, blob: new globalThis.Blob([serialized], { type: mime[value.format] }), context: current, draft: value });
+      nodes.preview.textContent = ready.serialized;
+      fillList(nodes.included, [...included]); fillList(nodes.excluded, [...excluded]);
+      nodes['source-limit'].textContent = sourceLimit;
+      pending = null; status(resultState, 'changed'); nodes.message.textContent = '';
+    } catch {
+      if (!alive || pending !== job || job.id !== serial) return;
+      if (clock() - job.started >= 10000) { timeout(); return; }
+      if (!validContext(current)) return;
+      discard(); status('error', 'buildError');
+    }
+  }
+  async function save() {
+    if (!alive || !ready || pending || handoff) return;
+    if (!validContext(ready.context)) return;
+    const value = draft(), error = validation(value);
+    if (error || !sameDraft(value, ready.draft) || nodes.preview.textContent !== ready.serialized) {
+      discard(); status(error ? 'error' : 'unconfirmed', error || 'changed'); return;
+    }
+    const snapshot = ready; ready = null; // consume intent BEFORE invoking adapter
+    const job = { id: serial, context: snapshot.context, controller: new globalThis.AbortController() };
+    handoff = job; status('unconfirmed', 'saving');
+    // choices cannot initiate another preview while the adapter result is unknown
+    for (const key of ['filename', 'format', 'private']) nodes[key].disabled = true;
+    try {
+      const result = await performDownload(Object.freeze({ serialized: snapshot.serialized, blob: snapshot.blob, filename: snapshot.draft.filename, format: snapshot.draft.format, context: snapshot.context, signal: job.controller.signal }));
+      if (!alive || handoff !== job || job.id !== serial || !validContext(job.context)) return;
+      status(result?.outcome === 'saved' ? 'success' : 'unconfirmed', result?.outcome === 'saved' ? 'saved' : result?.outcome === 'initiated' ? 'initiated' : 'unknown');
+    } catch {
+      if (alive && handoff === job && job.id === serial && validContext(job.context)) status('unconfirmed', 'unknown');
+    } finally {
+      if (handoff === job) {
+        handoff = null;
+        if (alive) {
+          for (const key of ['filename', 'format', 'private']) nodes[key].disabled = false;
+          nodes.refresh.disabled = false; nodes.save.disabled = true;
+          if (job.id !== serial) status('unconfirmed', 'unknown');
+        }
+      }
+    }
+  }
+  function focusable() {
+    return Array.from(nodes.dialog.querySelectorAll('input,select,button,[tabindex="0"]')).filter(el => !el.disabled);
+  }
+  function keydown(event) {
+    if (!alive) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancel(); }
+    if (event.key === 'Tab') {
+      const items = focusable(), first = items[0], last = items.at(-1);
+      const active = nodes.dialog.getRootNode().activeElement || root.activeElement || doc.activeElement;
+      if (event.shiftKey && (active === first || !nodes.dialog.contains(active))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (active === last || !nodes.dialog.contains(active))) { event.preventDefault(); first?.focus(); }
+    }
+  }
+  function cancel() {
+    if (!alive) return;
+    discard(true); if (handoff) handoff.controller.abort();
+    alive = false; listeners.splice(0).forEach(off => off()); container.remove();
+    container = null; nodes = null; observed = null;
+    // A pending handoff remains latched until settled: reopening never repeats it.
+    if (opener?.isConnected && typeof opener.focus === 'function') opener.focus();
+    opener = null;
+  }
+  function open({ opener: target } = {}) {
+    if (destroyed) throw new Error('Export dialog destroyed');
+    if (alive) return;
+    const language = String(getLanguage());
+    L = copy[language.startsWith('pl') ? 'pl' : 'en'];
+    ui = createUiV3({ language });
+    opener = target || root.activeElement || doc.activeElement;
+    container = doc.createElement('div'); container.setAttribute('data-ha-tools-export', '');
+    // The own shadow boundary contains CSS and local IDs; adjacent W4 status
+    // elements retain their existing styling. Consumers can query this open root.
+    const shadow = container.attachShadow({ mode: 'open' });
+    if (root.host?.classList.contains('bento-dark')) container.classList.add('bento-dark');
+    const style = doc.createElement('style'); style.textContent = ':host{display:block;min-width:0;max-width:100%;}' + css + '\n' + ui.css;
+    shadow.append(style);
+    const shell = doc.createElement('div'); shell.setAttribute('data-ha-tools-export', ''); shadow.append(shell);
+    nodes = {};
+    const make = (tag, key, parent, text) => { const node = doc.createElement(tag); if (key) { node.dataset.export = key; nodes[key] = node; } if (text) node.textContent = text; parent.append(node); return node; };
+    const dialog = make('section', 'dialog', shell); dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
+    const title = make('h2', 'title', dialog, L.title);
+    // Locally unique IDs, no random or global counters/persistent state.
+    const prefix = `ht-export-${String(clock()).replace(/\W/g, '')}`;
+    title.id = prefix + '-title'; dialog.setAttribute('aria-labelledby', title.id);
+    const fields = make('div', null, dialog); fields.className = 'ht-export-fields';
+    const filenameLabel = make('label', null, fields); make('span', null, filenameLabel, L.filename);
+    const filename = make('input', 'filename', filenameLabel); filename.type = 'text'; filename.value = defaultFilename; filename.autocomplete = 'off';
+    const formatLabel = make('label', null, fields); make('span', null, formatLabel, L.format);
+    const format = make('select', 'format', formatLabel);
+    formats.forEach(value => { const option = make('option', null, format, value.toUpperCase()); option.value = value; }); format.value = defaultFormat;
+    const privateLabel = make('label', null, dialog); privateLabel.className = 'ht-export-private';
+    const privateInput = make('input', 'private', privateLabel); privateInput.type = 'checkbox'; privateInput.checked = false; make('span', null, privateLabel, L.private);
+    const statusLine = make('p', null, dialog); statusLine.setAttribute('role', 'status'); statusLine.setAttribute('aria-live', 'polite');
+    make('span', 'status', statusLine); make('span', 'message', statusLine);
+    for (const key of ['included', 'excluded']) { make('h3', null, dialog, L[key]); make('ul', key, dialog); }
+    make('h3', null, dialog, L.source); make('p', 'source-limit', dialog);
+    const previewHeading = make('h3', null, dialog, L.preview); previewHeading.id = prefix + '-preview';
+    const preview = make('pre', 'preview', dialog); preview.tabIndex = 0; preview.setAttribute('aria-labelledby', previewHeading.id);
+    const actions = make('div', null, dialog); actions.className = 'ht-export-actions';
+    for (const key of ['refresh', 'save', 'cancel']) { const button = make('button', key, actions, L[key]); button.type = 'button'; }
+    root.append(container); alive = true; observed = readContext();
+    for (const [key, event] of [['filename', 'input'], ['format', 'change'], ['private', 'change']]) on(nodes[key], event, changeDraft);
+    on(nodes.refresh, 'click', refresh); on(nodes.save, 'click', save); on(nodes.cancel, 'click', cancel);
+    on(doc, 'keydown', keydown, true);
+    on(doc, 'focusin', event => {
+      if (alive && !event.composedPath().includes(nodes.dialog)) focusable()[0]?.focus();
+    }, true);
+    // The consumer supplies exact opener even when its shadow DOM hides activeElement.
+    filename.focus();
+    if (handoff) {
+      for (const key of ['filename', 'format', 'private']) nodes[key].disabled = true;
+      preview.focus();
+      status('unconfirmed', 'saving');
+    } else { status('not_checked', 'changed'); void refresh(); }
+  }
+  function destroy() { cancel(); destroyed = true; }
+  return Object.freeze({ open, cancel, contextChanged, destroy });
+}
+// END HA TOOLS EXPORT V3
+
+// BEGIN HA YAML REPORTS V1 source-sha256=b508ff0c427a9eb71395f393e5d8e9e1ab7c9382842d31087bc33c10439b58dd
+// Reviewed YAML Checker report policy. No raw objects, arbitrary strings or recursive redaction.
+function csvCell(value) {
+  let text = typeof value === 'string' ? value : typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+  if (/^[\s\uFEFF]*[=+@-]/u.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+function createYamlReports({now = () => Date.now(), monotonic = () => performance.now()} = {}) {
+  const definitions = {
+    config: {method:'POST config/core/check_config',source:'ha_native_validator',metrics:['checks','errors','warnings','skipped','notChecked'],
+      en:'Native HA validator response only; no YAML, configuration, messages, paths or component names.',
+      pl:'Tylko odpowiedź natywnego walidatora HA; bez YAML, konfiguracji, komunikatów, ścieżek i nazw komponentów.'},
+    entities: {method:'explicit automation/config and states snapshot',source:'ha_automation_and_state_snapshot',metrics:['checks','entities','automations','scripts','checkedReferences','errors','duplicateIds','problemStates','unnamedEntities','undescribedAutomations','skipped','notChecked'],
+      en:'Automation references and state snapshot only; script configuration unsupported; unnamed entities capped at 50. No IDs, aliases, names or configuration.',
+      pl:'Tylko odwołania automatyzacji i migawka stanów; konfiguracja skryptów nieobsługiwana; encje bez nazw ograniczone do 50. Bez ID, aliasów, nazw i konfiguracji.'},
+    files: {method:'explicit registry/log counts and ha_yaml_checker/scan_files',source:'ha_registry_and_top_level_syntax',metrics:['files','checks','errors','skipped','notChecked','entities','devices','areas','logErrors','logWarnings','components'],
+      en:'Top-level syntax only; includes and secrets are not validated; registry/log counts may be unavailable. No file paths, log content, HA address or configuration.',
+      pl:'Tylko składnia plików głównych; dołączenia i sekrety nie są walidowane; liczniki rejestrów/logów mogą być niedostępne. Bez ścieżek, treści logów, adresu HA i konfiguracji.'},
+    paste: {method:'explicit local heuristics and ha_yaml_checker/check_syntax',source:'local_heuristics_and_optional_ha_syntax',metrics:['checks','lines','errors','warnings','skipped','notChecked'],
+      en:'Local heuristic counts plus optional HA syntax parser; no schema/integration validation or included files. No pasted YAML or diagnostic messages.',
+      pl:'Liczniki lokalnych heurystyk i opcjonalny parser składni HA; bez walidacji schematu/integracji i dołączonych plików. Bez wklejonego YAML i komunikatów diagnostycznych.'},
+    template: {method:'POST template',source:'ha_template_invocation',metrics:['checks','errors','skipped','notChecked'],
+      en:'Template API invocation status only; does not validate configuration or template semantics. No template input, output or error message.',
+      pl:'Tylko status wywołania API szablonów; nie waliduje konfiguracji ani znaczenia szablonu. Bez treści, wyniku i komunikatu błędu szablonu.'},
+  };
+  const count = v => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
+  const length = v => Array.isArray(v) ? v.length : null;
+  const messages = v => v === null || v === undefined ? 0 : typeof v === 'string' ? v.split('\n').filter(x=>x.trim()).length : Array.isArray(v) ? v.length : null;
+  let epoch=0, ordinal=0;
+  const observations = new Map();
+  const nullMetrics = scope => Object.fromEntries(definitions[scope].metrics.map(key=>[key,null]));
+  function begin(scope) {
+    if (!Object.hasOwn(definitions,scope)) throw new TypeError('Unknown reviewed scope');
+    const token=Object.freeze({scope,epoch,ordinal:++ordinal,started:monotonic()});
+    observations.set(scope,{token,phase:'pending',status:'not_checked',observedAt:null,metrics:nullMetrics(scope),timing:null});
+    return token;
+  }
+  function finish(token,result) {
+    if (!token || token.epoch!==epoch || observations.get(token.scope)?.token!==token) return false;
+    const r=result && typeof result==='object' ? result : {},scope=token.scope,m=nullMetrics(scope);
+    let status='unconfirmed';
+    if (scope==='config') {
+      if (r.ok===true || r.ok===false) {
+        status=r.ok ? 'success':'error';m.checks=1;m.errors=messages(r.raw?.errors);m.warnings=messages(r.raw?.warnings);m.skipped=0;m.notChecked=0;
+      }
+    } else if (scope==='entities' && !r.error && count(r.totalEntities)!==null) {
+      m.entities=count(r.totalEntities);m.automations=count(r.totalAutomations);m.scripts=count(r.totalScripts);m.checkedReferences=count(r.checkedCount);
+      m.errors=length(r.broken);m.duplicateIds=length(r.dupIds);m.problemStates=length(r.problemStates);m.unnamedEntities=length(r.noFriendlyName);m.undescribedAutomations=length(r.autoNoDesc);
+      m.skipped=count(r.unreadableAutomations);m.notChecked=count(r.totalScripts);
+      m.checks=m.automations!==null && m.skipped!==null && m.skipped<=m.automations ? m.automations-m.skipped : null;
+      status=m.checks===null || m.errors===null || m.duplicateIds===null || m.skipped===null || m.notChecked===null || m.problemStates===null || m.unnamedEntities===null || m.undescribedAutomations===null ? 'unconfirmed'
+        : m.errors>0 || m.duplicateIds>0 ? 'error' : m.skipped>0 || m.notChecked>0 || m.problemStates>0 || m.unnamedEntities>0 || m.undescribedAutomations>0 ? 'partial' : 'success';
+    } else if (scope==='files' && !r.error && Array.isArray(r.files)) {
+      m.files=r.files.length;m.checks=r.files.filter(f=>f?.status==='pass'||f?.status==='fail').length;
+      m.errors=r.files.filter(f=>f?.status==='fail').length;m.skipped=r.files.filter(f=>f?.status==='skipped').length;
+      m.notChecked=m.files-m.checks-m.skipped;
+      if(m.checks===0)m.errors=null;
+      if(m.checks===0 && m.notChecked===m.files)m.skipped=null;
+      for (const [key,input] of [['entities','entityCount'],['devices','deviceCount'],['areas','areaCount'],['logErrors','logErrors'],['logWarnings','logWarnings'],['components','components']]) m[key]=count(r[input]);
+      status=m.errors>0?'error':m.checks===0?'unconfirmed':m.skipped>0||m.notChecked>0||['entities','devices','areas','logErrors','logWarnings','components'].some(k=>m[k]===null)?'partial':'success';
+    } else if (scope==='paste') {
+      const syntax=r.syntax?.status;
+      m.lines=count(r.heuristic?.lineCount);m.errors=length(r.heuristic?.errors);m.warnings=length(r.heuristic?.warnings);
+      m.checks=['valid','invalid'].includes(syntax)?1:0;m.skipped=syntax==='unsupported'?1:0;m.notChecked=m.checks===0?1:0;
+      status=syntax==='invalid'?'error':syntax==='valid'?(m.lines===null||m.errors===null||m.warnings===null?'unconfirmed':m.errors>0||m.warnings>0?'partial':'success'):syntax==='unsupported'?'partial':'unconfirmed';
+    } else if (scope==='template' && typeof r.ok==='boolean') {
+      // Success means only observed API completion, never template semantic validity.
+      status=r.ok?'success':'error';m.checks=1;m.errors=r.ok?0:1;m.skipped=0;m.notChecked=0;
+    }
+    observations.set(scope,{token,phase:'observed',status,observedAt:new Date(now()).toISOString(),metrics:m,
+      timing:{durationMs:Math.max(0,Math.round(monotonic()-token.started)),checkOrdinal:token.ordinal}});
+    return true;
+  }
+  function invalidate(scope) {
+    // A restored source never restores its epoch or completion token.
+    epoch++;
+    if(scope) observations.delete(scope);else observations.clear();
+  }
+  const hasObserved = () => Array.from(observations.values()).some(row=>row.phase==='observed');
+  function build({format,includePrivate=false,language='en'}={}) {
+    if (!['json','csv','txt'].includes(format)) throw new TypeError('Unsupported reviewed format');
+    const pl=String(language).startsWith('pl'),lang=pl?'pl':'en';
+    const sourceLimit=pl?'Tylko wyniki zaobserwowanych, jawnie uruchomionych kontroli. To częściowy raport, nie potwierdzenie poprawności całej konfiguracji. null oznacza brak pomiaru; brak i oczekiwanie nie są sukcesem.':'Only observed, explicitly started checks. This is a partial report, not confirmation that the full configuration is valid. null means no measurement; missing and pending are not success.';
+    const checks=Object.entries(definitions).map(([scope,d])=>{
+      const row=observations.get(scope),data={scope,method:d.method,source:d.source,timeSource:'frontend_observed_utc',phase:row?.phase||'missing',observedAt:row?.observedAt||null,status:row?.status||'not_checked',metrics:row?{...row.metrics}:nullMetrics(scope),limitations:d[lang]};
+      if(includePrivate && row?.timing)data.timing={durationMs:row.timing.durationMs,checkOrdinal:row.timing.checkOrdinal};
+      return data;
+    });
+    const report={schema:'ha-yaml-report-v1',status:'partial',sourceLimit,checks};
+    let serialized;
+    if(format==='json')serialized=JSON.stringify(report,null,2)+'\n';
+    else {
+      // Fixed schema: no caller-supplied keys, names or object coercion.
+      const rows=[['schema','status','sourceLimit','scope','method','source','timeSource','phase','observedAt','resultState','metric','value','limitations','durationMs','checkOrdinal']];
+      for(const row of checks)for(const [metric,value]of Object.entries(row.metrics))rows.push([report.schema,report.status,sourceLimit,row.scope,row.method,row.source,row.timeSource,row.phase,row.observedAt,row.status,metric,value===null?'null':value,row.limitations,row.timing?.durationMs??'',row.timing?.checkOrdinal??'']);
+      serialized=format==='csv'?rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'
+        :rows.map(row=>row.map(v=>v===null?'null':String(v)).join('\t')).join('\n')+'\n';
+    }
+    const included=[pl?'Metoda, źródło, czas UTC obserwacji, zakres, status W4 i sprawdzone liczniki.':'Method, source, observed UTC time, scope, W4 status and reviewed counts.'];
+    included.push(includePrivate?(pl?'Opcjonalnie: zmierzony czas trwania i lokalny numer jawnej kontroli.':'Optional: measured duration and local explicit-check ordinal.'):(pl?'Dodatkowe metadane czasu i kolejności wyłączone.':'Additional timing and sequence metadata off.'));
+    const excluded=[pl?'YAML, treść/wynik szablonu, surowe błędy, konfiguracja, tokeny, użytkownicy, adresy, identyfikatory, nazwy i ścieżki.':'YAML, template input/output, raw errors, configuration, tokens, users, addresses, identifiers, names and paths.'];
+    return {serialized,confirmed:hasObserved(),sourceConfirmed:hasObserved(),status:'partial',included,excluded,sourceLimit};
+  }
+  return Object.freeze({begin,finish,invalidate,hasObserved,build});
+}
+// END HA YAML REPORTS V1
+
 // Component-local persistence retains this card's existing localStorage keys.
 const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = h; }, async save(k, d) { try { localStorage.setItem('ha-yaml-checker-' + k, JSON.stringify(d)); } catch(e) { console.debug('[ha-yaml-checker] caught:', e); } }, async load(k) { try { const r = localStorage.getItem('ha-yaml-checker-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } }, loadSync(k) { try { const r = localStorage.getItem('ha-yaml-checker-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } } };
 
@@ -526,6 +977,11 @@ class HAYamlChecker extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._hass = null;
     this._requestEpoch = 0;
+    this._yamlReports = createYamlReports();
+    this._reportRevision = 0;
+    this._reportConnectionEpoch = 0;
+    this._exportDialog = null;
+    this._reportOffline = () => this._onReportConnectionChange();
     this._templateCheckSeq = 0;
     this._config = {};
     this._activeTab = 'config-check';
@@ -670,11 +1126,17 @@ class HAYamlChecker extends HTMLElement {
   set hass(hass) {
     const previousLanguage = this._lang;
     const principal = `${hass?.user?.id || ''}:${hass?.user?.is_admin === true}`;
+    const provider = hass?.config?.components?.includes('ha_yaml_checker') === true;
     const boundary = this._principal !== undefined
-      && (principal !== this._principal || hass?.connection !== this._connection);
+      && (principal !== this._principal || hass?.connection !== this._connection
+        || (hass?.connection?.connected !== false && !!hass) !== this._reportConnected
+        || provider !== this._reportProvider);
     if (boundary) this._invalidateRequests();
     this._principal = principal;
+    this._reportProvider = provider;
     this._connection = hass?.connection;
+    this._reportConnected = hass?.connection?.connected !== false && !!hass;
+    if (boundary) this._reportConnectionEpoch++;
     try {
       var _bg = (getComputedStyle(this).getPropertyValue('--card-background-color') || getComputedStyle(this).getPropertyValue('--primary-background-color') || '').trim();
       var _d = false;
@@ -689,6 +1151,9 @@ class HAYamlChecker extends HTMLElement {
 
     if (hass?.language) this._lang = hass.language.startsWith('pl') ? 'pl' : 'en';
     this._hass = hass;
+    this._listenReportConnection(this.isConnected ? hass?.connection : null);
+    if (previousLanguage !== this._lang) this._invalidateReportSource();
+    if (boundary) this._exportDialog?.contextChanged();
     if (!hass) return;
     if (!this._firstRender) {
       this._firstRender = true;
@@ -937,6 +1402,7 @@ class HAYamlChecker extends HTMLElement {
   }
 
   setConfig(config) {
+    this._invalidateReportSource();
     this._config = config || {};
     // Load persisted UI state
     try {
@@ -959,6 +1425,7 @@ class HAYamlChecker extends HTMLElement {
   }
 
   _invalidateRequests() {
+    this._invalidateReportSource();
     this._requestEpoch++;
     this._pasteCheckSeq++;
     this._templateCheckSeq++;
@@ -966,6 +1433,93 @@ class HAYamlChecker extends HTMLElement {
     this._pasteSyntax = this._pasteErrors = this._pasteValidatedValue = null;
     this._templateResult = null;
     this._checkLoading = this._entityLoading = this._scanLoading = this._templateLoading = false;
+  }
+
+
+  // The report store keeps only reviewed measurements from explicit native runs.
+  // It never reads YAML/template drafts or writes settings on open/refresh/export.
+  _invalidateReportSource() {
+    this._yamlReports.invalidate();
+    this._reportRevision++;
+    this._exportDialog?.contextChanged();
+  }
+
+  _beginReport(scope) {
+    const token = this._yamlReports.begin(scope);
+    this._reportRevision++;
+    this._exportDialog?.contextChanged();
+    return token;
+  }
+
+  _finishReport(token, result) {
+    if (!this._yamlReports.finish(token, result)) return;
+    this._reportRevision++;
+    this._exportDialog?.contextChanged();
+  }
+
+  _reportContext() {
+    const hass = this._hass;
+    return {
+      role: hass?.user?.is_admin === true ? 'admin' : 'user',
+      userId: hass?.user?.id || (hass?.user ? 'local-session' : 'no-user'),
+      connectionId: 'yaml-connection-' + this._reportConnectionEpoch,
+      datasetId: 'yaml-check-observations', revision: this._reportRevision,
+      connected: this.isConnected && !!hass && hass?.connection?.connected !== false && navigator.onLine !== false,
+      canExport: !!hass?.user, sourceConfirmed: this._yamlReports.hasObserved(),
+    };
+  }
+
+  _openYamlReport(opener) {
+    if (!this._exportDialog) this._exportDialog = createExportDialog({
+      root: this.shadowRoot, getLanguage: () => this._lang,
+      getContext: () => this._reportContext(), createUiV3,
+      policy: {id:'yaml-observed-checks-v1',
+        allowlistedFields:['schema','status','sourceLimit','checks.scope','checks.method','checks.source','checks.timeSource','checks.phase','checks.observedAt','checks.status','checks.metrics.checks','checks.metrics.errors','checks.metrics.warnings','checks.metrics.skipped','checks.metrics.notChecked','checks.metrics.entities','checks.metrics.automations','checks.metrics.scripts','checks.metrics.checkedReferences','checks.metrics.duplicateIds','checks.metrics.problemStates','checks.metrics.unnamedEntities','checks.metrics.undescribedAutomations','checks.metrics.files','checks.metrics.devices','checks.metrics.areas','checks.metrics.logErrors','checks.metrics.logWarnings','checks.metrics.components','checks.metrics.lines','checks.limitations','checks.timing.durationMs','checks.timing.checkOrdinal'],
+        neverInclude:['tokens','users','addresses','raw_config','yaml','raw_template','template_output','raw_errors','entity_ids','names','paths']},
+      formats:['json','csv','txt'], defaultFormat:'json', defaultFilename:'yaml-check-report.json',
+      buildPayload: ({draft}) => this._yamlReports.build({...draft,language:this._lang}),
+      performDownload: args => this._downloadYamlReport(args),
+    });
+    this._exportDialog.open({opener});
+  }
+
+  _downloadYamlReport({blob,filename,signal,context}) {
+    const current = this._reportContext();
+    if (signal.aborted || !current.connected || !current.canExport || !current.sourceConfirmed
+      || ['role','userId','connectionId','datasetId','revision'].some(key => current[key] !== context[key])) return {outcome:'unknown'};
+    const url = URL.createObjectURL(blob);
+    const anchor = this.ownerDocument.createElement('a');
+    anchor.href = url; anchor.download = filename;
+    // Use the one Blob frozen by W6, without reserializing or repeating a check.
+    this.shadowRoot.append(anchor);
+    try { anchor.click(); } finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    return {outcome:'initiated'}; // Browser handoff provides no disk-save confirmation.
+  }
+
+
+  _onReportConnectionChange() {
+    this._reportConnectionEpoch++;
+    this._reportConnected = !!this._hass && this._hass?.connection?.connected !== false;
+    this._invalidateRequests();
+    this._refreshTab(this._activeTab);
+  }
+
+  _listenReportConnection(connection) {
+    if (connection === this._reportEventConnection) return;
+    if (this._reportEventConnection) for (const event of ['ready','disconnected']) {
+      this._reportEventConnection.removeEventListener(event, this._reportOffline);
+    }
+    this._reportEventConnection = null;
+    if (typeof connection?.addEventListener === 'function' && typeof connection?.removeEventListener === 'function') {
+      this._reportEventConnection = connection;
+      for (const event of ['ready','disconnected']) connection.addEventListener(event, this._reportOffline);
+    }
+  }
+
+  connectedCallback() {
+    this._listenReportConnection(this._hass?.connection);
+    window.addEventListener('offline', this._reportOffline);
+    window.addEventListener('online', this._reportOffline);
   }
 
   _requestContext() {
@@ -994,6 +1548,7 @@ class HAYamlChecker extends HTMLElement {
     const hass = context.hass;
     if (hass?.user?.is_admin !== true || this._checkLoading) return;
     this._checkLoading = true;
+    const reportToken = this._beginReport('config');
     this._checkResult = null;
     this._refreshTab('config-check');
 
@@ -1033,6 +1588,7 @@ class HAYamlChecker extends HTMLElement {
         apiError: true,
       };
     }
+    this._finishReport(reportToken, this._checkResult);
     this._checkLoading = false;
     this._refreshTab('config-check');
   }
@@ -1103,6 +1659,7 @@ class HAYamlChecker extends HTMLElement {
     const hass = context.hass;
     if (this._entityLoading) return;
     this._entityLoading = true;
+    const reportToken = this._beginReport('entities');
     this._entityResult = null;
     this._refreshTab('entity-validator');
 
@@ -1227,6 +1784,7 @@ class HAYamlChecker extends HTMLElement {
       this._entityResult = { error: this._errorMessage(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
+    this._finishReport(reportToken, this._entityResult);
     this._entityLoading = false;
     this._refreshTab('entity-validator');
   }
@@ -1237,6 +1795,7 @@ class HAYamlChecker extends HTMLElement {
     const hass = context.hass;
     if (this._scanLoading) return;
     this._scanLoading = true;
+    const reportToken = this._beginReport('files');
     this._scanResult = { files: [], ts: null };
     this._refreshTab('file-scanner');
 
@@ -1315,6 +1874,7 @@ class HAYamlChecker extends HTMLElement {
       };
     }
 
+    this._finishReport(reportToken, this._scanResult);
     this._scanLoading = false;
     this._refreshTab('file-scanner');
   }
@@ -1328,6 +1888,7 @@ class HAYamlChecker extends HTMLElement {
     if (this._templateLoading) return;
     const sequence = ++this._templateCheckSeq;
     this._templateLoading = true;
+    const reportToken = this._beginReport('template');
     this._templateResult = null;
     this._refreshTab('template-tester');
 
@@ -1341,6 +1902,7 @@ class HAYamlChecker extends HTMLElement {
       this._templateResult = { ok: false, error: this._errorMessage(e), ts: new Date().toLocaleTimeString((this._lang === 'pl' ? 'pl-PL' : 'en-US')) };
     }
 
+    this._finishReport(reportToken, this._templateResult);
     this._templateLoading = false;
     this._refreshTab('template-tester');
   }
@@ -1350,6 +1912,7 @@ class HAYamlChecker extends HTMLElement {
     const context = this._requestContext();
     const hass = context.hass;
     const sequence = ++this._pasteCheckSeq;
+    const reportToken = this._beginReport('paste');
     this._pasteValue = value;
     this._pasteValidatedValue = value;
     this._pasteErrors = this._validateYAML(value);
@@ -1358,6 +1921,7 @@ class HAYamlChecker extends HTMLElement {
     const installed = hass?.config?.components?.includes('ha_yaml_checker');
     if (!installed || !hass?.user?.is_admin) {
       this._pasteSyntax = { status: 'unsupported' };
+      this._finishReport(reportToken, {syntax:this._pasteSyntax,heuristic:this._pasteErrors});
       this._refreshTab('paste-validate');
       return;
     }
@@ -1372,6 +1936,7 @@ class HAYamlChecker extends HTMLElement {
       if (sequence !== this._pasteCheckSeq) return;
       this._pasteSyntax = { status: 'unavailable' };
     }
+    this._finishReport(reportToken, {syntax:this._pasteSyntax,heuristic:this._pasteErrors});
     this._refreshTab('paste-validate');
   }
 
@@ -1634,6 +2199,7 @@ class HAYamlChecker extends HTMLElement {
   // ── Render ───────────────────────────────────────────────────────────────
   _render() {
     if (!this._hass) return;
+    this._exportDialog?.cancel();
     this.shadowRoot.innerHTML = `<style>${haToolsBentoCSS}
 /* === HA Tools split — premium banners (donate / intro / prereq) === */
 
@@ -1737,10 +2303,11 @@ ${this._css()}
   _html() {
     return `
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap:wrap">
           <span class="card-title-icon">🔍</span>
           <h2>${this._esc(this._config.title || "YAML Checker")}</h2>
           <span class="version-badge">v5.0.0</span>
+          <button type="button" id="btn-export-report" class="btn" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere">${this._lang === 'pl' ? 'Eksport raportu' : 'Export report'}</button>
         
         </div>
         <div class="tabs" id="tabs" role="tablist">
@@ -2153,6 +2720,7 @@ ${this._css()}
   }
 
   _attachEvents() {
+    this.shadowRoot.querySelector('#btn-export-report')?.addEventListener('click', event => this._openYamlReport(event.currentTarget));
     this.shadowRoot.querySelector('.support-dismiss')?.addEventListener('click', () => {
       try { localStorage.setItem('ha-yaml-checker-support-dismissed', '1'); } catch (_) {}
       this.shadowRoot.querySelector('.donate-section[data-source="own-card"]')?.remove();
@@ -2175,6 +2743,7 @@ ${this._css()}
       if (ta) this._runPasteValidation(ta.value);
     });
     on('btn-clear-paste', 'click', () => {
+      this._invalidateReportSource();
       this._pasteCheckSeq++;
       this._pasteValue = '';
       this._pasteValidatedValue = null;
@@ -2190,6 +2759,7 @@ ${this._css()}
     // Template examples
     this.shadowRoot.querySelectorAll('.template-example').forEach(btn => {
       btn.addEventListener('click', () => {
+        this._invalidateReportSource();
         this._templateCheckSeq++;
         this._templateLoading = false;
         this._templateValue = btn.dataset.tpl;
@@ -2200,9 +2770,9 @@ ${this._css()}
 
     // Live textarea tracking
     const yamlTA = this.shadowRoot.getElementById('yaml-input');
-    if (yamlTA) yamlTA.addEventListener('input', e => { this._pasteCheckSeq++; this._pasteValue = e.target.value; this._pasteValidatedValue = this._pasteErrors = this._pasteSyntax = null; this.shadowRoot.getElementById('paste-result')?.replaceChildren(); });
+    if (yamlTA) yamlTA.addEventListener('input', e => { this._invalidateReportSource(); this._pasteCheckSeq++; this._pasteValue = e.target.value; this._pasteValidatedValue = this._pasteErrors = this._pasteSyntax = null; this.shadowRoot.getElementById('paste-result')?.replaceChildren(); });
     const tmplTA = this.shadowRoot.getElementById('template-input');
-    if (tmplTA) tmplTA.addEventListener('input', e => { this._templateCheckSeq++; this._templateLoading = false; this._templateValue = e.target.value; this._templateResult = null; this.shadowRoot.getElementById('template-result')?.replaceChildren(); });
+    if (tmplTA) tmplTA.addEventListener('input', e => { this._invalidateReportSource(); this._templateCheckSeq++; this._templateLoading = false; this._templateValue = e.target.value; this._templateResult = null; this.shadowRoot.getElementById('template-result')?.replaceChildren(); });
   }
 
   _css() {
@@ -2325,6 +2895,10 @@ ${this._css()}
   }
 
   disconnectedCallback() {
+    this._listenReportConnection(null);
+    window.removeEventListener('offline', this._reportOffline);
+    window.removeEventListener('online', this._reportOffline);
+    this._exportDialog?.cancel();
     this._invalidateRequests();
     this._firstRender = false;
     this.shadowRoot.replaceChildren();
