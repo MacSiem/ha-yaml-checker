@@ -346,7 +346,7 @@ function createExportDialog(options) {
 }
 // END HA TOOLS EXPORT V3
 
-// BEGIN HA YAML REPORTS V1 source-sha256=b508ff0c427a9eb71395f393e5d8e9e1ab7c9382842d31087bc33c10439b58dd
+// BEGIN HA YAML REPORTS V1 source-sha256=0067a46cf39d998a8fe634dbf45b0766dda8843052780e1e8706be2b2416170a
 // Reviewed YAML Checker report policy. No raw objects, arbitrary strings or recursive redaction.
 function csvCell(value) {
   let text = typeof value === 'string' ? value : typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
@@ -362,11 +362,11 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
       en:'Automation references and state snapshot only; script configuration unsupported; unnamed entities capped at 50. No IDs, aliases, names or configuration.',
       pl:'Tylko odwołania automatyzacji i migawka stanów; konfiguracja skryptów nieobsługiwana; encje bez nazw ograniczone do 50. Bez ID, aliasów, nazw i konfiguracji.'},
     files: {method:'explicit registry/log counts and ha_yaml_checker/scan_files',source:'ha_registry_and_top_level_syntax',metrics:['files','checks','errors','skipped','notChecked','entities','devices','areas','logErrors','logWarnings','components'],
-      en:'Top-level syntax only; includes and secrets are not validated; registry/log counts may be unavailable. No file paths, log content, HA address or configuration.',
-      pl:'Tylko składnia plików głównych; dołączenia i sekrety nie są walidowane; liczniki rejestrów/logów mogą być niedostępne. Bez ścieżek, treści logów, adresu HA i konfiguracji.'},
+      en:'Top-level syntax only; includes and secrets are not validated; registry/log counts may be unavailable. fileSlot follows the 1-based top-level list shown by the checker; locations cover observed diagnostics only, capped at 500. No file paths, log content, HA address or configuration.',
+      pl:'Tylko składnia plików głównych; dołączenia i sekrety nie są walidowane; liczniki rejestrów/logów mogą być niedostępne. fileSlot to pozycja od 1 na liście plików głównych karty; lokalizacje obejmują tylko zaobserwowane diagnozy, limit 500. Bez ścieżek, treści logów, adresu HA i konfiguracji.'},
     paste: {method:'explicit local heuristics and ha_yaml_checker/check_syntax',source:'local_heuristics_and_optional_ha_syntax',metrics:['checks','lines','errors','warnings','skipped','notChecked'],
-      en:'Local heuristic counts plus optional HA syntax parser; no schema/integration validation or included files. No pasted YAML or diagnostic messages.',
-      pl:'Liczniki lokalnych heurystyk i opcjonalny parser składni HA; bez walidacji schematu/integracji i dołączonych plików. Bez wklejonego YAML i komunikatów diagnostycznych.'},
+      en:'Local heuristic counts plus optional HA syntax parser; no schema/integration validation or included files. Available line/column numbers cover observed diagnostics only, capped at 500. No pasted YAML or diagnostic messages.',
+      pl:'Liczniki lokalnych heurystyk i opcjonalny parser składni HA; bez walidacji schematu/integracji i dołączonych plików. Dostępne numery wiersza/kolumny obejmują tylko zaobserwowane diagnozy, limit 500. Bez wklejonego YAML i komunikatów diagnostycznych.'},
     template: {method:'POST template',source:'ha_template_invocation',metrics:['checks','errors','skipped','notChecked'],
       en:'Template API invocation status only; does not validate configuration or template semantics. No template input, output or error message.',
       pl:'Tylko status wywołania API szablonów; nie waliduje konfiguracji ani znaczenia szablonu. Bez treści, wyniku i komunikatu błędu szablonu.'},
@@ -382,6 +382,32 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     const token=Object.freeze({scope,epoch,ordinal:++ordinal,started:monotonic()});
     observations.set(scope,{token,phase:'pending',status:'not_checked',observedAt:null,metrics:nullMetrics(scope),timing:null});
     return token;
+  }
+  // Numeric locations only; coverage concerns observed diagnostics, never full validity.
+  // fileSlot is a 1-based position in the card's top-level file list, never a path/name.
+  function projectLocations(scope, result) {
+    const positive = value => Number.isSafeInteger(value) && value > 0 ? value : null;
+    if (!['files','paste'].includes(scope)) return {locations:null,locationCoverage:'unavailable'};
+    let locations=[], expected=0, complete=true;
+    const add = (kind, row, fileSlot=null) => {
+      expected++;
+      const line=positive(row?.line),column=positive(row?.column);
+      if(line!==null && locations.length<500) locations.push({kind,fileSlot,line,column});
+    };
+    if(scope==='files') {
+      if(result.error || !Array.isArray(result.files) || !result.files.some(row=>['pass','fail'].includes(row?.status))) return {locations:null,locationCoverage:'unavailable'};
+      result.files.forEach((row,index)=>{if(row?.status==='fail')add('syntax',row,index+1);});
+    } else {
+      const syntax=result.syntax?.status;
+      if(syntax==='invalid')add('syntax',result.syntax);
+      else if(syntax!=='valid')complete=false;
+      for(const [key,kind] of [['errors','heuristic_error'],['warnings','heuristic_warning']]) {
+        const rows=result.heuristic?.[key];
+        if(Array.isArray(rows))rows.forEach(row=>add(kind,row));else complete=false;
+      }
+    }
+    if(expected!==locations.length)complete=false;
+    return {locations,locationCoverage:complete?'complete':'partial'};
   }
   function finish(token,result) {
     if (!token || token.epoch!==epoch || observations.get(token.scope)?.token!==token) return false;
@@ -415,7 +441,7 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
       // Success means only observed API completion, never template semantic validity.
       status=r.ok?'success':'error';m.checks=1;m.errors=r.ok?0:1;m.skipped=0;m.notChecked=0;
     }
-    observations.set(scope,{token,phase:'observed',status,observedAt:new Date(now()).toISOString(),metrics:m,
+    observations.set(scope,{token,phase:'observed',status,observedAt:new Date(now()).toISOString(),metrics:m,...projectLocations(scope,r),
       timing:{durationMs:Math.max(0,Math.round(monotonic()-token.started)),checkOrdinal:token.ordinal}});
     return true;
   }
@@ -430,7 +456,7 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     const pl=String(language).startsWith('pl'),lang=pl?'pl':'en';
     const sourceLimit=pl?'Tylko wyniki zaobserwowanych, jawnie uruchomionych kontroli. To częściowy raport, nie potwierdzenie poprawności całej konfiguracji. null oznacza brak pomiaru; brak i oczekiwanie nie są sukcesem.':'Only observed, explicitly started checks. This is a partial report, not confirmation that the full configuration is valid. null means no measurement; missing and pending are not success.';
     const checks=Object.entries(definitions).map(([scope,d])=>{
-      const row=observations.get(scope),data={scope,method:d.method,source:d.source,timeSource:'frontend_observed_utc',phase:row?.phase||'missing',observedAt:row?.observedAt||null,status:row?.status||'not_checked',metrics:row?{...row.metrics}:nullMetrics(scope),limitations:d[lang]};
+      const row=observations.get(scope),data={scope,method:d.method,source:d.source,timeSource:'frontend_observed_utc',phase:row?.phase||'missing',observedAt:row?.observedAt||null,status:row?.status||'not_checked',metrics:row?{...row.metrics}:nullMetrics(scope),limitations:d[lang],locations:row?.locations??null,locationCoverage:row?.locationCoverage||'unavailable'};
       if(includePrivate && row?.timing)data.timing={durationMs:row.timing.durationMs,checkOrdinal:row.timing.checkOrdinal};
       return data;
     });
@@ -439,12 +465,16 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     if(format==='json')serialized=JSON.stringify(report,null,2)+'\n';
     else {
       // Fixed schema: no caller-supplied keys, names or object coercion.
-      const rows=[['schema','status','sourceLimit','scope','method','source','timeSource','phase','observedAt','resultState','metric','value','limitations','durationMs','checkOrdinal']];
-      for(const row of checks)for(const [metric,value]of Object.entries(row.metrics))rows.push([report.schema,report.status,sourceLimit,row.scope,row.method,row.source,row.timeSource,row.phase,row.observedAt,row.status,metric,value===null?'null':value,row.limitations,row.timing?.durationMs??'',row.timing?.checkOrdinal??'']);
+      const rows=[['schema','status','sourceLimit','scope','method','source','timeSource','phase','observedAt','resultState','metric','value','limitations','durationMs','checkOrdinal','locationKind','fileSlot','line','column','locationCoverage']];
+      for(const row of checks) {
+        const prefix=[report.schema,report.status,sourceLimit,row.scope,row.method,row.source,row.timeSource,row.phase,row.observedAt,row.status];
+        for(const [metric,value]of Object.entries(row.metrics))rows.push([...prefix,metric,value===null?'null':value,row.limitations,row.timing?.durationMs??'',row.timing?.checkOrdinal??'','','','','',row.locationCoverage]);
+        for(const location of row.locations||[])rows.push([...prefix,'location','observed',row.limitations,row.timing?.durationMs??'',row.timing?.checkOrdinal??'',location.kind,location.fileSlot??'',location.line,location.column??'null',row.locationCoverage]);
+      }
       serialized=format==='csv'?rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'
         :rows.map(row=>row.map(v=>v===null?'null':String(v)).join('\t')).join('\n')+'\n';
     }
-    const included=[pl?'Metoda, źródło, czas UTC obserwacji, zakres, status W4 i sprawdzone liczniki.':'Method, source, observed UTC time, scope, W4 status and reviewed counts.'];
+    const included=[pl?'Metoda, źródło, czas UTC obserwacji, zakres, status W4, sprawdzone liczniki i dostępne numery lokalizacji diagnostycznych (maksymalnie 500 na zakres).':'Method, source, observed UTC time, scope, W4 status, reviewed counts and available numeric diagnostic locations (maximum 500 per scope).'];
     included.push(includePrivate?(pl?'Opcjonalnie: zmierzony czas trwania i lokalny numer jawnej kontroli.':'Optional: measured duration and local explicit-check ordinal.'):(pl?'Dodatkowe metadane czasu i kolejności wyłączone.':'Additional timing and sequence metadata off.'));
     const excluded=[pl?'YAML, treść/wynik szablonu, surowe błędy, konfiguracja, tokeny, użytkownicy, adresy, identyfikatory, nazwy i ścieżki.':'YAML, template input/output, raw errors, configuration, tokens, users, addresses, identifiers, names and paths.'];
     return {serialized,confirmed:hasObserved(),sourceConfirmed:hasObserved(),status:'partial',included,excluded,sourceLimit};
