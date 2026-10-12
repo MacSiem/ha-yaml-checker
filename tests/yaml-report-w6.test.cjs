@@ -257,3 +257,18 @@ for (const eventName of ['disconnected','offline'])test(`typed ${eventName} rema
   assert.equal(card._reportContext().connected,true);assert.equal(card._yamlReports.hasObserved(),false);
  }finally{f.dom.window.close();}
 });
+
+test('reviewed numeric error locations omit file paths, raw diagnostics and malformed coordinates in every format',()=>{
+ const r=reports();finish(r,'files',{files:[{status:'fail',line:27,column:3,path:poison,reason:poison},{status:'fail',line:poison,column:0},{status:'pass',line:1,column:1}],entityCount:0,deviceCount:0,areaCount:0,logErrors:0,logWarnings:0,components:0});
+ finish(r,'paste',{syntax:{status:'invalid',line:5,column:9,error:poison},heuristic:{lineCount:12,errors:[{line:3,msg:poison}],warnings:[{line:8,msg:poison}]}});
+ const d=JSON.parse(r.build({format:'json',language:'en'}).serialized);
+ assert.deepEqual(d.checks[2].locations,[{kind:'syntax',fileSlot:1,line:27,column:3}]);assert.equal(d.checks[2].locationCoverage,'partial');
+ assert.deepEqual(d.checks[3].locations,[{kind:'syntax',fileSlot:null,line:5,column:9},{kind:'heuristic_error',fileSlot:null,line:3,column:null},{kind:'heuristic_warning',fileSlot:null,line:8,column:null}]);assert.equal(d.checks[3].locationCoverage,'complete');
+ assert.equal(d.checks[0].locations,null);assert.equal(d.checks[0].locationCoverage,'unavailable');
+ for(const format of ['json','csv','txt'])for(const includePrivate of [false,true]){const text=r.build({format,includePrivate,language:'en'}).serialized;assert.doesNotMatch(text,/CANARY|private\/path|secret@example/);assert.match(text,/27/);assert.match(text,/heuristic_warning/);}
+});
+test('location cap preserves measured counts and incomplete coverage without inventing positions',()=>{
+ const r=reports();finish(r,'paste',{syntax:{status:'unsupported'},heuristic:{lineCount:600,errors:Array.from({length:501},(_,i)=>({line:i+1,msg:poison})),warnings:[]}});
+ let row=JSON.parse(r.build({format:'json',language:'en'}).serialized).checks[3];assert.equal(row.metrics.errors,501);assert.equal(row.locations.length,500);assert.equal(row.locationCoverage,'partial');
+ finish(r,'paste',{syntax:{status:'invalid',line:0,column:3},heuristic:{lineCount:4,errors:[{line:'3',msg:poison}],warnings:[]}});row=JSON.parse(r.build({format:'json',language:'en'}).serialized).checks[3];assert.deepEqual(row.locations,[]);assert.equal(row.locationCoverage,'partial');
+});
