@@ -1185,7 +1185,7 @@ class HAYamlChecker extends HTMLElement {
     if (hass?.language) this._lang = hass.language.startsWith('pl') ? 'pl' : 'en';
     this._hass = hass;
     this._listenReportConnection(this.isConnected ? hass?.connection : null);
-    if (previousLanguage !== this._lang) this._invalidateReportSource();
+    if (previousLanguage !== this._lang) { this._yamlReports.cancelPending(); this._reportRevision++; this._exportDialog?.contextChanged(); }
     if (boundary) this._exportDialog?.contextChanged();
     if (!hass) return;
     if (!this._firstRender) {
@@ -1471,8 +1471,8 @@ class HAYamlChecker extends HTMLElement {
 
   // The report store keeps only reviewed measurements from explicit native runs.
   // It never reads YAML/template drafts or writes settings on open/refresh/export.
-  _invalidateReportSource() {
-    this._yamlReports.invalidate();
+  _invalidateReportSource(scope) {
+    this._yamlReports.invalidate(scope);
     this._reportRevision++;
     this._exportDialog?.contextChanged();
   }
@@ -2793,7 +2793,7 @@ ${this._css()}
       if (ta) this._runPasteValidation(ta.value);
     });
     on('btn-clear-paste', 'click', () => {
-      this._invalidateReportSource();
+      this._invalidateReportSource('paste');
       this._pasteCheckSeq++;
       this._pasteValue = '';
       this._pasteValidatedValue = null;
@@ -2809,7 +2809,7 @@ ${this._css()}
     // Template examples
     this.shadowRoot.querySelectorAll('.template-example').forEach(btn => {
       btn.addEventListener('click', () => {
-        this._invalidateReportSource();
+        this._invalidateReportSource('template');
         this._templateCheckSeq++;
         this._templateLoading = false;
         this._templateValue = btn.dataset.tpl;
@@ -2820,9 +2820,9 @@ ${this._css()}
 
     // Live textarea tracking
     const yamlTA = this.shadowRoot.getElementById('yaml-input');
-    if (yamlTA) yamlTA.addEventListener('input', e => { this._invalidateReportSource(); this._pasteCheckSeq++; this._pasteValue = e.target.value; this._pasteValidatedValue = this._pasteErrors = this._pasteSyntax = null; this.shadowRoot.getElementById('paste-result')?.replaceChildren(); });
+    if (yamlTA) yamlTA.addEventListener('input', e => { this._invalidateReportSource('paste'); this._pasteCheckSeq++; this._pasteValue = e.target.value; this._pasteValidatedValue = this._pasteErrors = this._pasteSyntax = null; this.shadowRoot.getElementById('paste-result')?.replaceChildren(); });
     const tmplTA = this.shadowRoot.getElementById('template-input');
-    if (tmplTA) tmplTA.addEventListener('input', e => { this._invalidateReportSource(); this._templateCheckSeq++; this._templateLoading = false; this._templateValue = e.target.value; this._templateResult = null; this.shadowRoot.getElementById('template-result')?.replaceChildren(); });
+    if (tmplTA) tmplTA.addEventListener('input', e => { this._invalidateReportSource('template'); this._templateCheckSeq++; this._templateLoading = false; this._templateValue = e.target.value; this._templateResult = null; this.shadowRoot.getElementById('template-result')?.replaceChildren(); });
   }
 
   _css() {

@@ -98,9 +98,12 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     return true;
   }
   function invalidate(scope) {
-    // A restored source never restores its epoch or completion token.
+    // Deleting one scope removes its token permanently; unrelated completed checks remain useful.
+    if(scope) observations.delete(scope);else {epoch++;observations.clear();}
+  }
+  function cancelPending() {
     epoch++;
-    if(scope) observations.delete(scope);else observations.clear();
+    for(const [scope,row] of observations)if(row.phase==='pending')observations.delete(scope);
   }
   const hasObserved = () => Array.from(observations.values()).some(row=>row.phase==='observed');
   function build({format,includePrivate=false,language='en'}={}) {
@@ -131,7 +134,7 @@ function createYamlReports({now = () => Date.now(), monotonic = () => performanc
     const excluded=[pl?'YAML, treść/wynik szablonu, surowe błędy, konfiguracja, tokeny, użytkownicy, adresy, identyfikatory, nazwy i ścieżki.':'YAML, template input/output, raw errors, configuration, tokens, users, addresses, identifiers, names and paths.'];
     return {serialized,confirmed:hasObserved(),sourceConfirmed:hasObserved(),status:'partial',included,excluded,sourceLimit};
   }
-  return Object.freeze({begin,finish,invalidate,hasObserved,build});
+  return Object.freeze({begin,finish,invalidate,cancelPending,hasObserved,build});
 }
 // Node tests use the canonical factory; this line is excluded from runtime copies.
 if (typeof module !== 'undefined' && module.exports) module.exports = { createYamlReports, csvCell };
