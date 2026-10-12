@@ -286,3 +286,9 @@ test('editing a pasted draft invalidates only that result while retaining indepe
  const pending=card._yamlReports.begin('paste');card._yamlReports.invalidate('paste');assert.equal(card._yamlReports.finish(pending,{syntax:{status:'valid'},heuristic:{lineCount:1,errors:[],warnings:[]}}),false);
  }finally{f.dom.window.close();}
 });
+
+test('changing language keeps completed observations but cancels pending old-language reports',async()=>{
+ const f=fixture();try{const {card,hass}=f;await card._runConfigCheck();const before=f.calls(),pending=card._yamlReports.begin('template');card.hass={...hass,language:'pl'};
+ const d=JSON.parse(card._yamlReports.build({format:'json',language:'pl'}).serialized);assert.equal(d.checks[0].phase,'observed');assert.equal(d.checks[4].phase,'missing');assert.equal(card._yamlReports.finish(pending,{ok:true,value:poison}),false);assert.equal(f.calls(),before);
+ }finally{f.dom.window.close();}
+});
