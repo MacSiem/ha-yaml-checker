@@ -279,3 +279,10 @@ test('native parser errors are separate from zero heuristic errors, and missing 
  finish(r,'paste',{syntax:{status:'valid'},heuristic:{lineCount:1,errors:[],warnings:[]}});d=JSON.parse(r.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[3].metrics.syntaxErrors,0);
  finish(r,'paste',{syntax:{status:'unavailable'},heuristic:{lineCount:1,errors:[],warnings:[]}});d=JSON.parse(r.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[3].metrics.syntaxErrors,null);
 });
+
+test('editing a pasted draft invalidates only that result while retaining independent completed HA checks',async()=>{
+ const f=fixture();try{const {card,dom}=f;await card._runConfigCheck();const before=f.calls();card._updateTab('paste-validate');const ta=card.shadowRoot.getElementById('yaml-input');ta.value='a: [';ta.dispatchEvent(new dom.window.Event('input'));
+ let d=JSON.parse(card._yamlReports.build({format:'json',language:'en'}).serialized);assert.equal(d.checks[0].phase,'observed');assert.equal(d.checks[0].status,'success');assert.equal(d.checks[3].phase,'missing');assert.equal(f.calls(),before);
+ const pending=card._yamlReports.begin('paste');card._yamlReports.invalidate('paste');assert.equal(card._yamlReports.finish(pending,{syntax:{status:'valid'},heuristic:{lineCount:1,errors:[],warnings:[]}}),false);
+ }finally{f.dom.window.close();}
+});
