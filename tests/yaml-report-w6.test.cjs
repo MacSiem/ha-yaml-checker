@@ -245,3 +245,15 @@ test('unavailable file syntax never manufactures an observed zero error or skipp
  assert.equal(row.status,'unconfirmed');assert.equal(row.metrics.errors,null);assert.equal(row.metrics.skipped,null);assert.equal(row.metrics.notChecked,2);
  assert.equal(row.metrics.entities,null);assert.equal(row.metrics.devices,null);assert.equal(row.metrics.areas,null);
 });
+
+for (const eventName of ['disconnected','offline'])test(`typed ${eventName} remains authoritative while cached flags and hass assignments lag`, async()=>{
+ const f=fixture();try{
+  const {card,hass,dom}=f;const connection=new dom.window.EventTarget();connection.connected=true;card.hass={...hass,connection};
+  await card._runConfigCheck();await open(card);const before=f.calls();
+  if(eventName==='disconnected')connection.dispatchEvent(new dom.window.Event('disconnected'));else dom.window.dispatchEvent(new dom.window.Event('offline'));
+  assert.equal(card._reportContext().connected,false);card.hass={...hass,connection};assert.equal(card._reportContext().connected,false);
+  await card._runConfigCheck();assert.equal(f.calls(),before);assert.equal(card._yamlReports.hasObserved(),false);
+  if(eventName==='disconnected')connection.dispatchEvent(new dom.window.Event('ready'));else dom.window.dispatchEvent(new dom.window.Event('online'));
+  assert.equal(card._reportContext().connected,true);assert.equal(card._yamlReports.hasObserved(),false);
+ }finally{f.dom.window.close();}
+});
