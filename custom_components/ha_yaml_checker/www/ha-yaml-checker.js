@@ -1499,8 +1499,10 @@ class HAYamlChecker extends HTMLElement {
   }
 
 
-  _reportOnline() {
-    return this.isConnected && !!this._hass && this._hass?.connection?.connected !== false
+  _reportOnline() { return this.isConnected && this._reportTransportAvailable(); }
+
+  _reportTransportAvailable() {
+    return !!this._hass && this._hass?.connection?.connected !== false
       && this._reportEventConnected !== false && this._reportBrowserOnline !== false && navigator.onLine !== false;
   }
 
@@ -1537,7 +1539,7 @@ class HAYamlChecker extends HTMLElement {
   _requestContext() {
     const epoch = this._requestEpoch;
     const source = this._hass;
-    const current = () => epoch === this._requestEpoch && this._reportOnline();
+    const current = () => epoch === this._requestEpoch && this._reportTransportAvailable();
     const guarded = method => async (...args) => {
       if (!current()) throw Error('Request cancelled');
       const result = await source[method](...args);
@@ -1558,7 +1560,7 @@ class HAYamlChecker extends HTMLElement {
   async _runConfigCheck() {
     const context = this._requestContext();
     const hass = context.hass;
-    if (!this._reportOnline()) return;
+    if (!this._reportTransportAvailable()) return;
     if (hass?.user?.is_admin !== true || this._checkLoading) return;
     this._checkLoading = true;
     const reportToken = this._beginReport('config');
@@ -1670,7 +1672,7 @@ class HAYamlChecker extends HTMLElement {
   async _runEntityValidation() {
     const context = this._requestContext();
     const hass = context.hass;
-    if (!this._reportOnline()) return;
+    if (!this._reportTransportAvailable()) return;
     if (this._entityLoading) return;
     this._entityLoading = true;
     const reportToken = this._beginReport('entities');
@@ -1807,7 +1809,7 @@ class HAYamlChecker extends HTMLElement {
   async _runFileScan() {
     const context = this._requestContext();
     const hass = context.hass;
-    if (!this._reportOnline()) return;
+    if (!this._reportTransportAvailable()) return;
     if (this._scanLoading) return;
     this._scanLoading = true;
     const reportToken = this._beginReport('files');
@@ -1900,7 +1902,7 @@ class HAYamlChecker extends HTMLElement {
     const hass = context.hass;
     const template = this._templateValue;
     if (!template.trim()) return;
-    if (!this._reportOnline()) return;
+    if (!this._reportTransportAvailable()) return;
     if (this._templateLoading) return;
     const sequence = ++this._templateCheckSeq;
     this._templateLoading = true;
@@ -1927,7 +1929,7 @@ class HAYamlChecker extends HTMLElement {
   async _runPasteValidation(value) {
     const context = this._requestContext();
     const hass = context.hass;
-    if (!this._reportOnline()) return;
+    if (!this._reportTransportAvailable()) return;
     const sequence = ++this._pasteCheckSeq;
     const reportToken = this._beginReport('paste');
     this._pasteValue = value;
