@@ -685,7 +685,7 @@ const haToolsBentoCSS = `
   border-radius: var(--bento-radius-pill) !important;
   margin-bottom: 0 !important;
   transition: all var(--bento-trans) !important;
-  white-space: nowrap !important; flex: 1 1 auto !important; text-align: center !important; min-height: 40px !important;
+  white-space: normal !important; flex: 1 1 auto !important; text-align: center !important; min-height: 44px !important;
   letter-spacing: -0.005em !important;
 }
 .tab:hover, .tab-btn:hover, .tab-button:hover, .dtab:hover {
@@ -999,6 +999,113 @@ pre {
   .overview-grid, .stats-grid, .summary-grid { grid-template-columns: 1fr 1fr; }
   .stat-value, .stat-val, .kpi-val { font-size: 18px; }
 }
+`;
+
+
+// Card-local presentation only: current navigation is the sole source of picker options.
+function _rememberTabFocus(card) {
+  const active = card.shadowRoot?.activeElement;
+  if (active?.id === 'ha-tools-tab-picker') return { picker: true };
+  if (active?.closest('.tabs') && active.dataset.tab) return { tab: active.dataset.tab };
+  return null;
+}
+function _bindResponsiveTabs(card, restoreFocus = null) {
+  const root = card.shadowRoot;
+  const nav = root?.querySelector('.tabs');
+  if (!nav) { card._tabResizeObserver?.disconnect(); card._tabResizeObserver = null; card.removeAttribute('data-responsive-tabs-observed'); return; }
+  let label = root.querySelector('.ht-tab-picker');
+  if (!label) {
+    label = card.ownerDocument.createElement('div');
+    label.className = 'ht-tab-picker';
+    const text = card.ownerDocument.createElement('label'); text.htmlFor = 'ha-tools-tab-picker'; label.append(text);
+    const select = card.ownerDocument.createElement('select');
+    select.id = 'ha-tools-tab-picker'; label.append(select); nav.before(label);
+    select.addEventListener('change', () => {
+      const currentNav = root.querySelector('.tabs');
+      const button = Array.from(currentNav?.querySelectorAll('button[data-tab]') || [])
+        .find(item => item.dataset.tab === select.value && !item.disabled && !item.hidden);
+      // Reuse the exact existing navigation/action path, including its guards.
+      if (button) button.click();
+      _bindResponsiveTabs(card);
+    });
+  }
+  label.firstElementChild.textContent = card._lang === 'pl' ? 'Zakładka' : 'Tab';
+  const select = label.querySelector('select');
+  const buttons = Array.from(nav.querySelectorAll('button[data-tab]')).filter(button => !button.hidden && !button.disabled);
+  const options = Array.from(select.options);
+  if (options.length !== buttons.length || buttons.some((button, index) => options[index]?.value !== button.dataset.tab)) {
+    select.replaceChildren(...buttons.map(button => {
+      const option = card.ownerDocument.createElement('option'); option.value = button.dataset.tab; return option;
+    }));
+  }
+  buttons.forEach((button, index) => { select.options[index].textContent = button.getAttribute('aria-label') || button.textContent.trim(); });
+  const selected = buttons.find(button => button.classList.contains('active'));
+  select.value = selected?.dataset.tab || '';
+  const applyWidth = width => {
+    const currentNav = root.querySelector('.tabs'), currentLabel = root.querySelector('.ht-tab-picker');
+    if (!currentNav || !currentLabel) return;
+    const input = currentLabel.querySelector('select');
+    const active = root.activeElement;
+    const narrow = width < 280;
+    const fromTab = currentNav.contains(active), fromPicker = active === input;
+    currentNav.hidden = narrow; currentLabel.hidden = !narrow;
+    if (narrow && fromTab) input.focus({ preventScroll: true });
+    else if (!narrow && fromPicker) currentNav.querySelector('button.active')?.focus({ preventScroll: true });
+  };
+  if (card._tabContainerWidth == null) {
+    const style = getComputedStyle(card);
+    card._tabContainerWidth = card.getBoundingClientRect().width
+      - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+      - (parseFloat(style.borderLeftWidth) || 0) - (parseFloat(style.borderRightWidth) || 0);
+  }
+  // Zero-width detached/test hosts default to tabs until an actual size arrives.
+  applyWidth(card._tabContainerWidth > 0 ? card._tabContainerWidth : 900);
+  if (typeof ResizeObserver !== 'function') { nav.hidden = false; label.hidden = false; }
+  if (!card._tabResizeObserver && typeof ResizeObserver === 'function' && card.isConnected) {
+    // While observed, JS toggles visibility after capturing focus. This avoids
+    // CSS hiding the focused control before ResizeObserver can transfer it.
+    card.setAttribute('data-responsive-tabs-observed', '');
+    card._tabResizeObserver = new ResizeObserver(entries => {
+      const entry = entries.find(item => item.target === card);
+      if (!entry) return;
+      card._tabContainerWidth = entry.contentRect.width;
+      applyWidth(card._tabContainerWidth);
+    });
+    card._tabResizeObserver.observe(card);
+  }
+  if (restoreFocus) {
+    const button = buttons.find(item => item.dataset.tab === restoreFocus.tab) || selected;
+    if (nav.hidden || restoreFocus.picker && !label.hidden) select.focus({ preventScroll: true });
+    else button?.focus({ preventScroll: true });
+  }
+}
+const _RESPONSIVE_CONTROL_CSS = `
+/* Host width, including Sections/sidebar placement, determines navigation. */
+:host { container-type:inline-size;container-name:ha-tools-card;min-width:0; }
+.card { min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere; }
+button,summary,a[href],input:not([type=checkbox]):not([type=radio]),select,textarea {
+  box-sizing:border-box;min-height:44px !important;min-width:44px !important;max-width:100%;
+}
+button,summary,a[href] { white-space:normal;overflow-wrap:anywhere; }
+a[href] { display:inline-flex;align-items:center; }
+input:not([type=checkbox]):not([type=radio]),select,textarea { min-width:44px !important; }
+button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+  outline:3px solid var(--primary-color,#1769aa) !important;outline-offset:2px;
+}
+.tabs { flex-wrap:wrap !important;overflow:visible !important;min-width:0;max-width:100%; }
+.tabs button[data-tab] { min-width:44px !important;min-height:44px !important;white-space:normal !important;overflow-wrap:anywhere;max-width:100%; }
+.ht-tab-picker { display:none;min-width:0;gap:6px;margin:0 0 16px; }
+.ht-tab-picker select { width:100%;font:inherit;color:var(--primary-text-color,inherit);background:var(--card-background-color,transparent);padding:8px;border:1px solid var(--divider-color,#aaa);border-radius:8px; }
+.tabs[hidden],.ht-tab-picker[hidden] { display:none !important; }
+.donate-section[data-source="own-card"] a { min-height:44px;min-width:44px; }
+.intro-banner,.tip-banner { padding-right:64px !important; }
+@container ha-tools-card (width < 280px) {
+  .tabs { display:none !important; }
+  .ht-tab-picker:not([hidden]) { display:flex;flex-direction:column; }
+}
+/* Observed hosts retain their focused navigation until the width callback. */
+:host([data-responsive-tabs-observed]) .tabs:not([hidden]) { display:flex !important; }
+:host([data-responsive-tabs-observed]) .ht-tab-picker:not([hidden]) { display:flex;flex-direction:column; }
 `;
 
 class HAYamlChecker extends HTMLElement {
@@ -2252,6 +2359,7 @@ class HAYamlChecker extends HTMLElement {
   // ── Render ───────────────────────────────────────────────────────────────
   _render() {
     if (!this._hass) return;
+    const tabFocus = _rememberTabFocus(this);
     this._exportDialog?.cancel();
     this.shadowRoot.innerHTML = `<style>${haToolsBentoCSS}
 /* === HA Tools split — premium banners (donate / intro / prereq) === */
@@ -2350,8 +2458,10 @@ ${this._css()}
           .stat-val, .kpi-val, .metric-val { font-size: 16px; }
         }
 
+${_RESPONSIVE_CONTROL_CSS}
 </style>${this._html()}`
     this._attachEvents();
+    _bindResponsiveTabs(this, tabFocus);
   }
   _html() {
     return `
@@ -2385,7 +2495,7 @@ ${this._css()}
           `).join('')}
         </div>
         <div id="tab-content">${this._renderTabContent()}</div>
-        ${this._hass?.user?.is_admin && this._config?.show_support !== false && !this._supportDismissed() ? `<div class="donate-section" data-source="own-card" style="margin:8px 0 0;padding:4px 0;background:none;border:0;box-shadow:none;min-height:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-direction:row;justify-content:flex-start;text-align:left"><a href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--secondary-text-color,#64748b);font-weight:400;text-decoration:underline">${this._lang === 'pl' ? 'Opcjonalne wsparcie HA Tools' : 'Optional support for HA Tools'}</a><button type="button" class="support-dismiss" aria-label="${this._lang === 'pl' ? 'Ukryj odnośnik wsparcia' : 'Dismiss support link'}" style="margin-left:auto;padding:2px 6px;min-height:0;line-height:1;border:0;background:none;color:var(--secondary-text-color,#64748b);cursor:pointer">×</button></div>` : ''}
+        ${this._hass?.user?.is_admin && this._config?.show_support !== false && !this._supportDismissed() ? `<div class="donate-section" data-source="own-card" style="margin:8px 0 0;padding:4px 0;background:none;border:0;box-shadow:none;min-height:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-direction:row;justify-content:flex-start;text-align:left"><a href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--secondary-text-color,#64748b);font-weight:400;text-decoration:underline">${this._lang === 'pl' ? 'Opcjonalne wsparcie HA Tools' : 'Optional support for HA Tools'}</a><button type="button" class="support-dismiss" aria-label="${this._lang === 'pl' ? 'Ukryj odnośnik wsparcia' : 'Dismiss support link'}" style="margin-left:auto;padding:2px 6px;min-height:44px;min-width:44px;line-height:1;border:0;background:none;color:var(--secondary-text-color,#64748b);cursor:pointer">×</button></div>` : ''}
       </div>
     `;
   }
@@ -2754,6 +2864,7 @@ ${this._css()}
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     });
+    _bindResponsiveTabs(this);
     const active = this.shadowRoot.activeElement;
     const editor = active?.id === 'yaml-input' || active?.id === 'template-input';
     const selection = editor ? {id: active.id, start: active.selectionStart,
@@ -2948,6 +3059,7 @@ ${this._css()}
   }
 
   disconnectedCallback() {
+    this._tabResizeObserver?.disconnect(); this._tabResizeObserver = null; this._tabContainerWidth = null; this.removeAttribute('data-responsive-tabs-observed');
     this._listenReportConnection(null);
     window.removeEventListener('offline', this._reportOffline);
     window.removeEventListener('online', this._reportOffline);
@@ -2984,12 +3096,13 @@ class HaYamlCheckerEditor extends HTMLElement {
       <style>
             :host { display:block; padding:16px; }
             h3 { margin:0 0 16px; font-size:15px; font-weight:600; color:var(--bento-text, var(--primary-text-color,#1e293b)); }
-            input { outline:none; transition:border-color .2s; }
+            input { box-sizing:border-box;min-height:44px;min-width:44px;max-width:100%;transition:border-color .2s; }
+            input:focus-visible { outline:3px solid var(--primary-color,#1769aa);outline-offset:2px; }
             input:focus { border-color:var(--bento-primary, var(--primary-color,#3b82f6)); }
         </style>
       <h3>YAML Checker</h3>
             <div style="margin-bottom:12px;">
-              <label style="display:block;font-weight:500;margin-bottom:4px;font-size:13px;">Title</label>
+              <label for="cf_title" style="display:block;font-weight:500;margin-bottom:4px;font-size:13px;">Title</label>
               <input type="text" id="cf_title" value="${_esc(this._config?.title || 'YAML Checker')}"
                 style="width:100%;padding:8px 12px;border:1px solid var(--divider-color,#e2e8f0);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#1e293b);font-size:14px;box-sizing:border-box;">
             </div>
