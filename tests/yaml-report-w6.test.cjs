@@ -181,7 +181,7 @@ test('reviewed W4/W6 vendors and integration mirror have exact source/runtime pr
   assert.equal(digest,meta.files['shared/'+file].sourceSha256);
   assert.ok(card.includes('// BEGIN '+name+' source-sha256='+digest+'\n'+transform(source)+'\n// END '+name));
  }
- assert.equal(meta.files['shared/ha-tools-export.js'].sourceSha256,'1f9e9c5444ec3b6de44eec136f14ae9e7d89dae1002650b33f746ab9633982f1');
+ assert.equal(meta.files['shared/ha-tools-export.js'].sourceSha256,'bae4197cb254a7e24affbf90f029833127c5ba09b5b96f876a6fd8112f816a3d');
 });
 
 
