@@ -5,6 +5,7 @@
 - Freeze one preview and consume one Save intent, invalidate stale account/connection/role/input results, and report download initiation as Unconfirmed when the browser cannot confirm a filesystem save.
 - Use the shared native review dialog with keyboard cancellation, focus return and per-export private fields off by default.
 - Make controls easier to use in narrow cards, wrap navigation and switch to the same tab choices in a compact selector below 280 px.
+- Restore the card shell and same-instance drafts when Home Assistant reconnects the custom element after dashboard editing without assigning fresh data; discarded check results remain discarded and no checks rerun automatically.
 - Test the integration in actual Home Assistant minimum 2025.2.0, stable 2026.10.1 and published beta 2026.10.0b7, retaining the real version assertion.
 
 ## 5.0.0 (2026-10-07)

@@ -86,7 +86,7 @@ another export.
 The card identifies HA's built-in validator. Dark mode follows your Home
 Assistant theme.*
 
-These are native Home Assistant screenshots of version 5.0.0 on a synthetic staging configuration. The valid result comes from HA’s configuration check. No household data appears in the images.
+These are native Home Assistant screenshots of version 5.1.0 on a synthetic staging configuration. The valid result comes from HA’s configuration check. No household data appears in the images.
 
 ## Installation
 
@@ -96,34 +96,43 @@ For the legacy Dashboard-card installation:
 2. Add `https://github.com/MacSiem/ha-yaml-checker` as category **Dashboard**.
 3. Install **YAML Checker** and reload your browser.
 
-Version 5.0.0 adds an **Integration** package. Check the
-[published releases](https://github.com/MacSiem/ha-yaml-checker/releases) for
-availability. If the HACS default catalog still lists the older Dashboard
-package while the category migration is under review, add this repository as a
-custom **Integration** after the 5.0.0 release is published:
-download YAML Checker in HACS, restart HA once, then add **YAML Checker** under
-Settings → Devices & services. The card registers automatically. The optional
-administrator sidebar appears at `/yaml-checker`; integration options can hide it.
-HA 2025.2 or later is required.
+Version 5.0.0 introduced the **Integration** package; version 5.1.0 also
+includes reviewed check reports. To install the integration:
 
-For manual development installation, copy `custom_components/ha_yaml_checker`
-to `<config>/custom_components/`, restart HA, and add the integration as above.
+1. Install the files:
+   - **HACS:** once the default catalog lists this repository as an
+     **Integration**, install **YAML Checker** from HACS → Integrations.
+     Until then HACS installs the Dashboard card and does not allow adding
+     the same registered repository again as a custom Integration.
+   - **Manual:** copy `custom_components/ha_yaml_checker` from the
+     [latest release](https://github.com/MacSiem/ha-yaml-checker/releases)
+     into your `config/custom_components/` directory.
+2. Restart Home Assistant.
+3. **Settings → Devices & services → Add integration → YAML Checker.**
+4. Open the administrator sidebar at `/yaml-checker` or keep your dashboard
+   card. HA 2025.2 or later is required.
 
-For a Dashboard-plugin migration, first update the standalone card to 5.0.0
-and reload the browser. Then change only this repository's HACS registration
-to Integration and install the integration package. Keep your existing card
-configuration and resource while checking the migration: storage-mode dashboards
-reuse a matching existing card resource, so it must contain the current card.
-Confirm that the integration is loaded, the card displays 5.0.0, and pasted YAML
-gets a separate HA parser result before retiring the old plugin registration.
-The 4.1.13 Dashboard package remains a rollback baseline. The default HACS
-catalog may retain its Dashboard category while the integration migration is
-under review. A category change alone is not a verified migration.
+Keep the working Dashboard plugin, its resource and existing card configuration
+while installing the integration manually. First update the standalone card to
+5.1.0 and reload the browser: storage-mode dashboards reuse the existing matching
+resource, so that resource must serve the current card. Verify that the integration
+is loaded, the card displays 5.1.0 and pasted YAML has a separate HA parser result
+before retiring the old plugin. The public 5.0.0 package remains the rollback
+baseline. The default catalog category migration is still under review; a category
+change alone is not a verified installation or migration.
 
 Without an existing card resource, storage mode creates one versioned module.
 YAML resource mode loads the bundled module automatically; existing YAML card
 definitions remain valid. After any frontend update, reload the browser to use
 the new module. Removing the integration removes only its owned panel/resource.
+
+### Editing a card with a draft
+
+Ordinary tab, language and layout changes retain the current YAML or template
+draft. Leaving dashboard edit mode without changing the card also retains it.
+Saving a changed card configuration can recreate the card and reset its local
+draft; copy an unsaved draft before doing that. Draft text is not persisted as
+part of the card configuration or exported report.
 
 ## Quick start
 
