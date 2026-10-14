@@ -1,7 +1,7 @@
 {
   "schema": "ha-yaml-report-provenance-v1",
   "baseHead": "0a8123fa22a03421bbea729137d8138faa52aaa7",
-  "canonicalConfigHead": "a96f66e17c330b4859dd6f7da8b5ad835da612ee",
+  "canonicalConfigHead": "5a74b10b0beafc820c21e2f28597527006c7ec70",
   "policy": "Explicit observed method/metrics only, never raw YAML/template/errors/config; private opt-in only measured timing/local ordinal",
   "files": {
     "shared/ha-tools-ui.js": {
@@ -11,9 +11,9 @@
       "transform": "strip Node-only footer"
     },
     "shared/ha-tools-export.js": {
-      "sourceSha256": "1f9e9c5444ec3b6de44eec136f14ae9e7d89dae1002650b33f746ab9633982f1",
-      "runtimeSha256": "f83f8ba9c0e0f0c41421c1f6beb78074d37ba79582bc15ae4cd9844d026559e5",
-      "origin": "/Volumes/Samsung_SSD/dev/repos/ha-config-auditor/shared/ha-tools-export.js",
+      "sourceSha256": "bae4197cb254a7e24affbf90f029833127c5ba09b5b96f876a6fd8112f816a3d",
+      "runtimeSha256": "a2e0c85f7fcf097d602bb37002a1ad14e968ddb69327b95b61c1c7899b0dedfb",
+      "origin": "ha-config-auditor/shared/ha-tools-export.js@5a74b10b0beafc820c21e2f28597527006c7ec70",
       "transform": "remove only export keyword"
     },
     "shared/ha-yaml-reports.js": {
