@@ -187,3 +187,33 @@ test('duplicate labels and file syntax statuses follow the current locale', asyn
     assert.doesNotMatch(statuses.map(x => x.textContent+' '+x.title).join(' '), /secret_file|Top-level|skipped|unknown/);
   } finally {dom.window.close();}
 });
+
+for (const [name, id, draft] of [
+  ['paste-validate', 'yaml-input', 'owner_synthetic: unsaved'],
+  ['template-tester', 'template-input', '{{ 6 * 7 }} unsaved'],
+]) {
+  test(`dashboard detach and reinsert restores ${name} without a fresh hass assignment or replaying a check`, async () => {
+    const {card, dom, hass} = fixture();
+    let calls = 0;
+    try {
+      card.hass = {...hass, callApi: async () => { calls++; return {result: 'valid'}; }};
+      await card._runConfigCheck();
+      tab(card, name);
+      const input = card.shadowRoot.getElementById(id);
+      input.value = draft;
+      input.dispatchEvent(new dom.window.Event('input', {bubbles: true}));
+      card.setConfig({...card._config, title: 'Edited YAML card'});
+      for (let cycle = 0; cycle < 2; cycle++) {
+        card.remove();
+        assert.equal(card.shadowRoot.childElementCount, 0);
+        dom.window.document.body.append(card);
+        // HA can reattach the same custom element without assigning hass again.
+        assert.equal(card.shadowRoot.querySelector('h2')?.textContent, 'Edited YAML card');
+        assert.equal(card.shadowRoot.getElementById(id)?.value, draft);
+        assert.equal(calls, 1, 'reconnection must not rerun HA checks');
+        assert.equal(JSON.parse(card._yamlReports.build({format: 'json'}).serialized).checks
+          .every(check => check.phase === 'missing'), true, 'old observations stay invalidated');
+      }
+    } finally { dom.window.close(); }
+  });
+}
