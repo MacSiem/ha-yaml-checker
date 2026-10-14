@@ -62,12 +62,12 @@ Version 5.1 can export a reviewed report from checks you ran explicitly. Open
 **Export report**, choose a filename and JSON, CSV or TXT, and review the exact
 content before Save. Opening or refreshing the export does not rerun checks.
 
-The report includes observed check scope, method, status, counts, timing and
+The report includes observed check scope, method, status, counts and
 safe error locations. Incomplete or unsupported checks stay explicit; locations
 are file slots and line/column numbers, without paths or source excerpts.
 Pasted YAML, templates, rendered template output, raw errors, names, entity IDs,
 user accounts, addresses, tokens and configuration contents are excluded.
-Optional private aggregate counts start off for every export.
+Optional measured duration and the local check ordinal start off for every export.
 
 Results belong to the current card and authenticated session. Changing the
 account, connection, role or checked input invalidates the previous result.
