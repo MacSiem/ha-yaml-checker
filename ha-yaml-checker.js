@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v5.0.0 (2026-10-01) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v5.1.0 (2026-10-14) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -520,7 +520,7 @@ const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = 
 const _esc = ((s) => String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 /**
- * HA YAML Checker v5.0.0
+ * HA YAML Checker v5.1.0
  * Advanced YAML validator for Home Assistant configuration files.
  * Part of HA Tools Panel - Debug category
  * Author: Jeff (AI) for MacSiem
@@ -2495,7 +2495,7 @@ ${_RESPONSIVE_CONTROL_CSS}
         <div class="card-header" style="flex-wrap:wrap">
           <span class="card-title-icon">🔍</span>
           <h2>${this._esc(this._config.title || "YAML Checker")}</h2>
-          <span class="version-badge">v5.0.0</span>
+          <span class="version-badge">v5.1.0</span>
           <button type="button" id="btn-export-report" class="btn" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere">${this._lang === 'pl' ? 'Eksport raportu' : 'Export report'}</button>
         
         </div>

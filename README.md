@@ -56,6 +56,26 @@ optional support link; they do not change your HA configuration:
 | | Paste and validate arbitrary YAML |
 | | Execute a Jinja2 template |
 
+## Reviewed check report
+
+Version 5.1 can export a reviewed report from checks you ran explicitly. Open
+**Export report**, choose a filename and JSON, CSV or TXT, and review the exact
+content before Save. Opening or refreshing the export does not rerun checks.
+
+The report includes observed check scope, method, status, counts, timing and
+safe error locations. Incomplete or unsupported checks stay explicit; locations
+are file slots and line/column numbers, without paths or source excerpts.
+Pasted YAML, templates, rendered template output, raw errors, names, entity IDs,
+user accounts, addresses, tokens and configuration contents are excluded.
+Optional private aggregate counts start off for every export.
+
+Results belong to the current card and authenticated session. Changing the
+account, connection, role or checked input invalidates the previous result.
+The native review dialog freezes one preview and consumes one Save intent;
+when the browser only starts a download, the result stays **Unconfirmed** rather
+than claiming that the file was saved. Review the filesystem before attempting
+another export.
+
 ## Screenshots
 
 | Light | Dark |

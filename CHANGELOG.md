@@ -1,3 +1,12 @@
+## 5.1.0 (2026-10-14)
+
+- Export reviewed results from explicitly run checks as JSON, CSV or TXT, with filename, scope, privacy exclusions and exact file preview before Save.
+- Keep incomplete checks, skipped files and unsupported observations explicit; export safe file slots and line/column locations without source excerpts, paths, names, entity IDs, tokens or pasted YAML/template contents.
+- Freeze one preview and consume one Save intent, invalidate stale account/connection/role/input results, and report download initiation as Unconfirmed when the browser cannot confirm a filesystem save.
+- Use the shared native review dialog with keyboard cancellation, focus return and per-export private fields off by default.
+- Make controls easier to use in narrow cards, wrap navigation and switch to the same tab choices in a compact selector below 280 px.
+- Test the integration in actual Home Assistant minimum 2025.2.0, stable 2026.10.1 and published beta 2026.10.0b7, retaining the real version assertion.
+
 ## 5.0.0 (2026-10-07)
 - Display readable HA API error messages, escape entity-check errors as text, and skip named pipes without waiting for a writer during file scans.
 - Stop parser/file commands while the integration is unloaded and recheck administrator access after pending scans. Remove only the integration-owned YAML-mode module on unload.
