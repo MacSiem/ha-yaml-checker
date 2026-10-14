@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { JSDOM } = require('jsdom');
+const installDialogHarness = require('./helpers/native-dialog.cjs');
 const { createYamlReports, csvCell } = require('../shared/ha-yaml-reports.js');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve=r; }); return {promise,resolve}; };
@@ -16,6 +17,7 @@ function reports() {
 }
 function fixture(language='en') {
   const dom = new JSDOM('<!doctype html><body></body>', {runScripts:'dangerously',url:'http://localhost/',pretendToBeVisual:true});
+  const nativeDialog = installDialogHarness(dom.window);
   dom.window.eval(fs.readFileSync(path.join(__dirname,'../ha-yaml-checker.js'),'utf8'));
   const card=dom.window.document.createElement('ha-yaml-checker');
   card.setConfig({type:'custom:ha-yaml-checker',show_support:false}); dom.window.document.body.append(card);
@@ -23,7 +25,7 @@ function fixture(language='en') {
   const hass={language,user:{id:'qa',is_admin:true},connection:{connected:true},states:{},config:{components:['ha_yaml_checker']},
     callApi:async()=>{calls++;return {result:'valid',errors:null,warnings:null};},callWS:async()=>{calls++;return [];}};
   card.hass=hass;
-  return {dom,card,hass,calls:()=>calls};
+  return {dom,card,hass,nativeDialog,calls:()=>calls};
 }
 function dialog(card) {return card.shadowRoot.querySelector('[data-ha-tools-export]')?.shadowRoot;}
 function node(card,key) {return dialog(card)?.querySelector(`[data-export="${key}"]`);}
@@ -290,5 +292,32 @@ test('editing a pasted draft invalidates only that result while retaining indepe
 test('changing language keeps completed observations but cancels pending old-language reports',async()=>{
  const f=fixture();try{const {card,hass}=f;await card._runConfigCheck();const before=f.calls(),pending=card._yamlReports.begin('template');card.hass={...hass,language:'pl'};
  const d=JSON.parse(card._yamlReports.build({format:'json',language:'pl'}).serialized);assert.equal(d.checks[0].phase,'observed');assert.equal(d.checks[4].phase,'missing');assert.equal(card._yamlReports.finish(pending,{ok:true,value:poison}),false);assert.equal(f.calls(),before);
+ }finally{f.dom.window.close();}
+});
+
+
+test('native report modal closes through Escape cancel and returns to its export opener',async()=>{
+ const f=fixture();try{
+  await f.card._runConfigCheck();await open(f.card);
+  const modal=dialog(f.card).querySelector('dialog');
+  assert.ok(modal,'Observed report must use a native modal');
+  assert.equal(modal.matches(':modal'),true);assert.equal(modal.isConnected,true);
+  assert.equal(f.nativeDialog.calls.filter(x=>x.kind==='showModal').length,1);
+  const event=new f.dom.window.Event('cancel',{cancelable:true});modal.dispatchEvent(event);
+  assert.equal(event.defaultPrevented,true);assert.equal(dialog(f.card),undefined);
+  assert.equal(f.card.shadowRoot.activeElement.id,'btn-export-report');
+ }finally{f.dom.window.close();}
+});
+
+test('full consumer repaint cancels its modal and a queued old close cannot dismiss the next report',async()=>{
+ const f=fixture();try{
+  await f.card._runConfigCheck();await open(f.card);
+  const first=dialog(f.card).querySelector('dialog');assert.ok(first,'Native dialog required');
+  f.card._render();assert.equal(first.open,false);assert.equal(dialog(f.card),undefined);
+  f.card.shadowRoot.querySelector('#btn-export-report').click();
+  const second=dialog(f.card).querySelector('dialog');assert.ok(second);assert.notEqual(second,first);
+  await flush();assert.equal(second.matches(':modal'),true);assert.equal(second.isConnected,true);
+  assert.equal(f.calls(),1,'Opening and repaint must not rerun the check');
+  node(f.card,'cancel').click();
  }finally{f.dom.window.close();}
 });
