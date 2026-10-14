@@ -1701,6 +1701,12 @@ class HAYamlChecker extends HTMLElement {
     this._listenReportConnection(this._hass?.connection);
     window.addEventListener('offline', this._reportOffline);
     window.addEventListener('online', this._reportOffline);
+    // Dashboard editing can reattach this element without assigning hass again.
+    // Restore the cleared shell and drafts; checks remain manual and invalidated.
+    if (this._hass && !this._firstRender) {
+      this._firstRender = true;
+      this._render();
+    }
   }
 
   _requestContext() {
