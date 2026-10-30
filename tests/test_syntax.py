@@ -69,5 +69,22 @@ class SyntaxTests(unittest.TestCase):
             self.assertEqual(row["status"], "skipped")
 
 
+
+    def test_invalid_unicode_paste_is_redacted_and_not_an_internal_error(self) -> None:
+        for invalid in ("\ud800", "\udfff"):
+            with self.subTest(codepoint=ord(invalid)):
+                result = MODULE.check_syntax("secret: PRIVATE-CANARY\nvalue: " + invalid + "\n")
+                self.assertEqual(result, {
+                    "schema": "ha-yaml-syntax-v1",
+                    "status": "invalid",
+                    "reason": "invalid_encoding",
+                })
+                self.assertNotIn("PRIVATE-CANARY", repr(result))
+
+    def test_valid_unicode_and_byte_limit_keep_existing_semantics(self) -> None:
+        self.assertEqual(MODULE.check_syntax("text: Zażółć 🏠\n")["status"], "valid")
+        self.assertEqual(MODULE.check_syntax("text: " + "ż" * 32769)["reason"], "too_large")
+
+
 if __name__ == "__main__":
     unittest.main()

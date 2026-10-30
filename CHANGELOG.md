@@ -1,3 +1,9 @@
+## 5.1.1 (2026-10-30)
+
+- Mark a configuration file as skipped (could not read the file) when it was read only in part or changed while it was read. 5.1.0 could report a valid prefix as a passed syntax check.
+- Report pasted text with a lone UTF-16 surrogate as invalid Unicode in Polish and English, in both the card and the integration's installed card, instead of an internal error shown as a generic syntax error. The response never contains the pasted YAML.
+- Keep the complete card and integration bundles identical.
+
 ## 5.1.0 (2026-10-14)
 
 - Export reviewed results from explicitly run checks as JSON, CSV or TXT, with filename, scope, privacy exclusions and exact file preview before Save.

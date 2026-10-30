@@ -1,4 +1,4 @@
-/* HA Tools split — ha-yaml-checker v5.1.0 (2026-10-14) — single-tool standalone repo */
+/* HA Tools split — ha-yaml-checker v5.1.1 (2026-10-30) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -520,7 +520,7 @@ const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = 
 const _esc = ((s) => String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 
 /**
- * HA YAML Checker v5.1.0
+ * HA YAML Checker v5.1.1
  * Advanced YAML validator for Home Assistant configuration files.
  * Part of HA Tools Panel - Debug category
  * Author: Jeff (AI) for MacSiem
@@ -2501,7 +2501,7 @@ ${_RESPONSIVE_CONTROL_CSS}
         <div class="card-header" style="flex-wrap:wrap">
           <span class="card-title-icon">🔍</span>
           <h2>${this._esc(this._config.title || "YAML Checker")}</h2>
-          <span class="version-badge">v5.1.0</span>
+          <span class="version-badge">v5.1.1</span>
           <button type="button" id="btn-export-report" class="btn" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere">${this._lang === 'pl' ? 'Eksport raportu' : 'Export report'}</button>
         
         </div>
@@ -2777,6 +2777,8 @@ ${_RESPONSIVE_CONTROL_CSS}
     const { errors = [], warnings = [], lineCount = 0 } = this._pasteErrors || {};
     const syntax = this._pasteSyntax;
     const syntaxLabel = syntax?.status === 'valid' ? (this._lang === 'pl' ? 'Składnia YAML poprawna (parser HA)' : 'YAML syntax valid (HA parser)')
+      : syntax?.status === 'invalid' && syntax?.reason === 'invalid_encoding'
+        ? (this._lang === 'pl' ? 'Nieprawidłowy tekst Unicode (nie można zakodować jako UTF-8)' : 'Invalid Unicode text (cannot be encoded as UTF-8)')
       : syntax?.status === 'invalid' ? (this._lang === 'pl' ? 'Błąd składni YAML' : 'YAML syntax error')
       : syntax?.status === 'checking' ? (this._lang === 'pl' ? 'Sprawdzanie składni…' : 'Checking syntax…')
       : (this._lang === 'pl' ? 'Składnia YAML niezweryfikowana' : 'YAML syntax not verified');

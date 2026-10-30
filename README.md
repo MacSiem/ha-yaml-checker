@@ -114,9 +114,9 @@ includes reviewed check reports. To install the integration:
 
 Keep the working Dashboard plugin, its resource and existing card configuration
 while installing the integration manually. First update the standalone card to
-5.1.0 and reload the browser: storage-mode dashboards reuse the existing matching
+5.1.1 and reload the browser: storage-mode dashboards reuse the existing matching
 resource, so that resource must serve the current card. Verify that the integration
-is loaded, the card displays 5.1.0 and pasted YAML has a separate HA parser result
+is loaded, the card displays 5.1.1 and pasted YAML has a separate HA parser result
 before retiring the old plugin. The public 5.0.0 package remains the rollback
 baseline. The default catalog category migration is still under review; a category
 change alone is not a verified installation or migration.
