@@ -73,15 +73,24 @@ def scan_files(config_dir: Path) -> dict[str, Any]:
                     if len(raw) > MAX_FILE_BYTES:
                         result["reason"] = "too_large"
                     else:
-                        try:
-                            parsed = check_syntax(raw.decode("utf-8-sig"), max_bytes=MAX_FILE_BYTES, max_events=100000)
-                        except UnicodeDecodeError:
-                            result["reason"] = "invalid_encoding"
+                        after = os.fstat(file.fileno())
+                        # A syntactically valid prefix does not prove a complete scan.
+                        before_identity = (info.st_dev, info.st_ino, info.st_size,
+                                           info.st_mtime_ns, info.st_ctime_ns)
+                        after_identity = (after.st_dev, after.st_ino, after.st_size,
+                                          after.st_mtime_ns, after.st_ctime_ns)
+                        if len(raw) != info.st_size or before_identity != after_identity:
+                            result["reason"] = "read_error"
                         else:
-                            result["status"] = "pass" if parsed["status"] == "valid" else "fail" if parsed["status"] == "invalid" else "skipped"
-                            for key in ("line", "column", "reason"):
-                                if key in parsed:
-                                    result[key] = parsed[key]
+                            try:
+                                parsed = check_syntax(raw.decode("utf-8-sig"), max_bytes=MAX_FILE_BYTES, max_events=100000)
+                            except UnicodeDecodeError:
+                                result["reason"] = "invalid_encoding"
+                            else:
+                                result["status"] = "pass" if parsed["status"] == "valid" else "fail" if parsed["status"] == "invalid" else "skipped"
+                                for key in ("line", "column", "reason"):
+                                    if key in parsed:
+                                        result[key] = parsed[key]
         except OSError:
             result = {"file": name, "status": "skipped", "reason": "read_error"}
         rows.append(result)
