@@ -2777,6 +2777,8 @@ ${_RESPONSIVE_CONTROL_CSS}
     const { errors = [], warnings = [], lineCount = 0 } = this._pasteErrors || {};
     const syntax = this._pasteSyntax;
     const syntaxLabel = syntax?.status === 'valid' ? (this._lang === 'pl' ? 'Składnia YAML poprawna (parser HA)' : 'YAML syntax valid (HA parser)')
+      : syntax?.status === 'invalid' && syntax?.reason === 'invalid_encoding'
+        ? (this._lang === 'pl' ? 'Nieprawidłowy tekst Unicode (nie można zakodować jako UTF-8)' : 'Invalid Unicode text (cannot be encoded as UTF-8)')
       : syntax?.status === 'invalid' ? (this._lang === 'pl' ? 'Błąd składni YAML' : 'YAML syntax error')
       : syntax?.status === 'checking' ? (this._lang === 'pl' ? 'Sprawdzanie składni…' : 'Checking syntax…')
       : (this._lang === 'pl' ? 'Składnia YAML niezweryfikowana' : 'YAML syntax not verified');

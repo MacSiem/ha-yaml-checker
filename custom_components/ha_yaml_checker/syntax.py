@@ -20,7 +20,15 @@ FILE_NAMES = (
 
 def check_syntax(source: str, *, max_bytes: int = MAX_BYTES, max_events: int = MAX_EVENTS) -> dict[str, Any]:
     """Return parser status and location only; never reflect pasted YAML."""
-    if not isinstance(source, str) or len(source.encode("utf-8")) > max_bytes:
+    if not isinstance(source, str) or len(source) > max_bytes:
+        return {"schema": "ha-yaml-syntax-v1", "status": "unsupported", "reason": "too_large"}
+    try:
+        encoded_length = len(source.encode("utf-8"))
+    except UnicodeEncodeError:
+        # A lone UTF-16 surrogate can arrive as a JSON escape over WebSocket.
+        # It cannot represent YAML text in UTF-8; never echo the source.
+        return {"schema": "ha-yaml-syntax-v1", "status": "invalid", "reason": "invalid_encoding"}
+    if encoded_length > max_bytes:
         return {"schema": "ha-yaml-syntax-v1", "status": "unsupported", "reason": "too_large"}
     try:
         for count, _event in enumerate(yaml.parse(source), start=1):
