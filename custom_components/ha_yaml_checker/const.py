@@ -2,7 +2,7 @@
 
 DOMAIN = "ha_yaml_checker"
 NAME = "YAML Checker"
-VERSION = "5.1.0"
+VERSION = "5.1.1"
 
 CARD_FILENAME = "ha-yaml-checker.js"
 CARD_ELEMENT = "ha-yaml-checker"
